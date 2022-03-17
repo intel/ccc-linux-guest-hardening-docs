@@ -3,6 +3,14 @@
 Intel® Trust Domain Extension Guest Linux\* Kernel Hardening Strategy
 #####################################################################
 
+Contributors:
+
+Elena Reshetova
+Tamas Lengyel
+Sebastian Osterlund
+Steffen Schulz
+
+
 1) Purpose of the document and targeted audience
 ************************************************
 
@@ -25,10 +33,10 @@ The hardening approach presented in this document is by no means an
 ultimate guarantee of 100% security against the above-mentioned attacks,
 but merely a methodology built to our best knowledge and resource
 limitations. In our environment, we have successfully applied it to the
-Linux TDX 1.0 software stack MVP release to the trust domain (TD) guest
-Linux kernel and hardened many involved kernel subsystems. This guide is
-written with the Linux kernel in mind, but the outlined principles can
-be applied to any software component.
+Linux TDX MVP software stack (https://github.com/intel/tdx-tools)
+to the trust domain (TD) guest Linux kernel and hardened many involved
+kernel subsystems. This guide is written with the Linux kernel in mind,
+but the outlined principles can be applied to any software component.
 
 The overall threat model and security architecture for the TD guest
 kernel is described in the :ref:`security-spec` and it is
@@ -124,7 +132,7 @@ deployment scenario.
      - Purpose and current state
    * - Driver filter
      - Limits a set of drivers that are enabled in runtime for the TD guest kernel.
-       By default, all PCI bus drivers are blocked unless they are in the allow
+       By default, all PCI and ACPI bus drivers are blocked unless they are in the allow
        list. The current default allow list for the PCI bus is limited to the
        following virtio drivers: virtio\_net, virtio\_console, virtio\_blk, and
        9pnet\_virtio.
@@ -144,7 +152,9 @@ deployment scenario.
        filter is not active and therefore it is only applicable for early port IO
        and normal port IO.
    * - ACPI table allow list
-     - TDVF measures a set of ACPI tables obtained from the host/VMM into TDX RTMR[
+     - TDX virtual firmware (TDVF, for details see 
+      https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.pdf)
+       measures a set of ACPI tables obtained from the host/VMM into TDX RTMR[
        0] measurement register. Thus, the set of tables passed by the host/VMM can
        be remotely attested and verified. However, it can be difficult for a
        remote verifier to understand the possible consequences from using a big
@@ -185,8 +195,7 @@ needed for the TD guest kernel.
    * - x86 features
      - Some x86 feature bits are explicitly cleared out by the TD guest kernel
        during an initialization, such as X86\_FEATURE\_MCE, X86\_FEATURE\_MTRR,
-       X86\_FEATURE\_TME, X86\_FEATURE\_APERFMPERF, X86\_FEATURE\_CQM\_LLC, and
-       tbd (there will be more)
+       X86\_FEATURE\_TME, X86\_FEATURE\_APERFMPERF, X86\_FEATURE\_CQM\_LLC.
    * - Various PCI functionality
      - Some PCI related functionality that is not needed in the TD guest kernel is
        also explicitly disabled, such as early PCI, PCI quirks, and enhanced PCI
@@ -194,7 +203,7 @@ needed for the TD guest kernel.
    * - Miscellaneous
      - A malicious host/VMM can fake PCI ids or some CPUID leaves to enable
        functionality that is normally disabled for a TDX guest and therefore not
-       hardened. To prevent this from happening, support for XEN, HyperV, and ACRN
+       hardened. To help prevent this from happening, support for XEN, HyperV, and ACRN
        hypervisors, as well as AMD northbridge support, is explicitly disabled in
        the TD guest kernel.
 
@@ -218,7 +227,7 @@ the device initialization routine).
 
 The attack surface minimization activity outlined in the previous
 section helps to limit the amount of TD guest kernel code that actively
-interacts with the untrusted host/VMM.I It is not possible to fully
+interacts with the untrusted host/VMM. It is not possible to fully
 remove this interaction due to the functional requirements that the TD
 guest has; it needs to be able to perform network communication, it
 should be possible to interact with the TD guest via console, etc. Thus,
@@ -249,7 +258,8 @@ this process:
 3.4) Check\_host\_input smatch pattern
 ======================================
 
-Based on the above requirements, a smatch static code analyzer [XXX] has
+Based on the above requirements, a smatch static code analyzer
+(http://smatch.sourceforge.net/) has
 been chosen since it provides an easy interface to write custom patterns
 to search for problematic locations in the kernel source tree. Smatch
 already has a big set of existing patterns that have been used to find
@@ -257,8 +267,7 @@ many security issues with the current mainline kernel.
 
 To identify the locations where a TD guest kernel can take an untrusted
 input from the host/VMM, a custom smatch pattern check\_host\_input has
-been written. It operates based on a list of “input functions” that is
-manually defined in smatch\_data/ kernel.host\_input\_funcs. The list
+been written. It operates based on a list of “host input functions”. The list
 contains known, low-level functions that perform MSR, port IO, and MMIO
 reads, such as native\_read\_msr, inb/w/l, readb/w/l, as well as
 higher-level wrappers specific to certain subsystems. For example, PCI
@@ -271,8 +280,7 @@ manual code audit process.
 
 The current approach using the check\_host\_input smatch pattern has
 several limitations. The main limitation is the importance of having a
-correct list of input functions in smatch\_data/
-kernel.host\_input\_funcs since the pattern will not detect the
+correct list of input functions since the pattern will not detect the
 invocations of functions not present in this list. Fortunately, the
 low-level functions for performing MSR, port IO, and MMIO read
 operations are well defined in the Linux kernel. The higher-level
@@ -280,27 +288,7 @@ wrappers can be identified by using an iterative approach: run the
 check\_host\_input smatch pattern to find all invocations of the
 low-level functions. By looking at these invocations, you can determine
 the next level wrappers, add them to the input function list, and re-run
-the smatch pattern again. Another notable issue is a lack of support in
-smatch to follow the invocation of the function pointers (unless smatch
-cross function database is used). This can create a problem in places
-where a higher-level wrapper or a code location invokes a host input
-function not directly but via a function pointer. For example, the
-`virtio\_cread <https://elixir.bootlin.com/linux/latest/C/ident/virtio_cread>`__
-macro used for reading the config space in virtIO subsystem is defined
-using an invocation of
-`vdev <https://elixir.bootlin.com/linux/latest/C/ident/vdev>`__->`config <https://elixir.bootlin.com/linux/latest/C/ident/config>`__->`get <https://elixir.bootlin.com/linux/latest/C/ident/get>`__
-function pointer, which reads the value of a requested configuration
-field. In practice, this function pointer ends up invoking a
-`vp\_get <https://elixir.bootlin.com/linux/latest/C/ident/vp_get>`__
-function to perform the actual read operation, but even if the vp\_get
-function is added to the list of input functions for the smatch pattern,
-it will not be able to detect its invocation via the
-vdev->\ `config <https://elixir.bootlin.com/linux/latest/C/ident/config>`__->`get <https://elixir.bootlin.com/linux/latest/C/ident/get>`__
-function pointer. To address this limitation, it is possible to modify
-the smatch pattern to perform a limited type matching and catch the
-above cases (as was done for the virtio\_cread and virtio\_cread\_le
-macros), but it is not a generic solution and requires knowledge of such
-problematic locations. Another limitation of this approach is the
+the smatch pattern again. Another limitation of this approach is the
 inability to detect generic DMA-style memory accesses, since they
 typically do not use any specific functions or wrappers to receive the
 data from the host/VMM. An exception here is a virtIO ring subsystem
@@ -444,13 +432,6 @@ statuses:
 
    * - **Status**
      - **Meaning**
-   * - safe
-     - The consumed host input is used in a secure way
-   * - concern
-     - The consumed host input is used in an unsecure way. There is an additional
-       comment indicating the exact reason. All concern items must be addressed
-       either by disabling the code that performs the host input processing or by
-       writing a patch that fixes the problematic input processing.
    * - excluded
      - This code location is not reachable inside a TD guest due to it being
        non-Intel code or functionality that is disabled for the TD guest kernel.
@@ -459,16 +440,21 @@ statuses:
        when executing the fuzzing activity described in the next section. We
        perform an additional verification that none of these excluded code
        locations can be reached by the fuzzer.
+   * - unclassified
+     - This code location is reachable inside TDX guest (i.e. not excluded), but
+       has not been manually audited yet. 
    * - wrapper
      - The function that consumed a host input is a higher-level wrapper. The
        function is being checked for processing the host input in a secure way,
        but additionally all its callers are also reported by the smatch pattern
        and the code audit happens on each caller.
-   * - investigate
-     - The code location is particularly difficult for manual analysis. More time
-       is required for analysis whenever it should be considered “safe” or
-       “concern”. Ideally, the final code audit report should not have any
-       entries of this type.
+   * - safe
+     - The consumed host input looks to be used in a secure way
+   * - concern
+     - The consumed host input is used in an unsecure way. There is an additional
+       comment indicating the exact reason. All concern items must be addressed
+       either by disabling the code that performs the host input processing or by
+       writing a patch that fixes the problematic input processing.
 
 The main challenge in this process is a decision whenever a certain
 reported code location is considered “safe” or “concern”. The typical
@@ -484,13 +470,15 @@ list of “concern” items can be classified into two categories:
    when an untrusted host input is used for operating TD guest clock or
    affecting KASLR randomization.
 
-TODO: insert examples
 
 3.6) Applying code audit results to different kernel trees
 ==========================================================
 
-The provided list of smatch findings for the version 5.xx kernel
-contains results of our manual code audit activity for this kernel and
+The provided list at https://github.com/intel/ccc-linux-guest-hardening/tree/master/audit/sample_output/5.15-rc1
+of smatch findings for the version 5.15-rc1 kernel
+contains results of our manual code audit activity for this kernel
+(Please note that the provided list
+does not have 'safe' or 'concern' markings published) and
 can be used as a baseline for performing a manual audit on other kernel
 versions or on custom vendor kernels. Here is the suggested procedure:
 
@@ -504,8 +492,7 @@ versions or on custom vendor kernels. Here is the suggested procedure:
        ~/smatch/smatch_scripts/test_kernel.sh
 
    Smatch stores results in smatch\_warns.txt in the root of the kernel
-   build directory. If only check\_host\_input pattern results are
-   desired in the output, the rest of smatch patterns can be disabled.
+   build directory.
 
 #. Process the smatch\_warns.txt output using process\_smatch\_output.py
    python script. If any additional drivers or subsystems are enabled,
@@ -516,7 +503,7 @@ versions or on custom vendor kernels. Here is the suggested procedure:
 
       python3 process_smatch_output.py smatch_warns.txt
 
-   The output file of this step, filtered\_smatch\_warns, is a reduced
+   The output file of this step, smatch_warns.txt\_filtered, is a reduced
    list of check\_host\_input smatch findings for a target kernel tree.
    This file should have all the relevant findings that should be
    manually audited.
@@ -559,7 +546,7 @@ transfer\_results.py script are automatically transferred based on the
 unique identifiers for each finding. Examples of these findings are
 shown in orange in Figure 2. Identifiers from a source kernel tree
 finding and target tree finding must match for a finding to be
-automatically transferred. An identifier is a simple djb2 hash [XXX] of
+automatically transferred. An identifier is a simple djb2 hash of
 an analyzed code expression together with a relative offset from the
 beginning of the function where this expression is located. It is
 possible to further improve the calculation of identifiers (and
@@ -786,7 +773,7 @@ a. **Core agent logic**: This includes fuzzer initialization and helper
    tdg\_fuzz\_enable(), and accepts control input via tdg\_fuzz\_event()
    to start/stop/pause input injection or report an error event.
    https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/guest/-/blob/kafl/fuzz-11/arch/x86/kernel/tdx-fuzz-kafl.c
-   TODO: put a link to external commit when available
+   TODO: put a link to external commit
 
 b. **Input hooks**: We currently leverage the tdx\_fuzz guest kernel
    hooks the same as ‘simple fuzzer’ described in section 3.3.3. If
@@ -1063,8 +1050,4 @@ https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/bkc/-/tree/fuzzers-2/kafl/us
 More sophisticated “harness” for randomized stimulus execution:
 https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/bkc/-/blob/fuzzers-2/kafl/userspace/sharedir_template/init.sh
 
-References
-**********
-
-Tbd or maybe embed in the text directly?
 

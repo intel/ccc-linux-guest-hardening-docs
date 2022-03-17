@@ -68,7 +68,7 @@ from the untrusted host/VMM.
 1) TDX Linux guest kernel overall hardening methodology
 =======================================================
 
-Document :ref:`tdx-guest-hardening describes the hardening methodology
+Document :ref:`tdx-guest-hardening` describes the hardening methodology
 that is used to perform systematic audits and fuzzing of the communication
 interfaces exposed to the malicious hypervisor. This document covers the
 kernel subsystems that are relevant to the described threat model and provides
@@ -115,7 +115,7 @@ are not accessible to the host/VMM. To explicitly share a MMIO region,
 the device must be authorized through the device filter framework,
 enabling MMIO operations. The handling of the
 MMIO input from the untrusted host/VMM must be hardened (see
-:ref:`tdx-guest-hardening for more information).
+:ref:`tdx-guest-hardening` for more information).
 
 The static code analysis tool should generate a list of all MMIO users
 based on use of the standard io.h macros. All portable code should use

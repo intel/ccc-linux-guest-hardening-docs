@@ -3,6 +3,11 @@
 Intel® Trust Domain Extension Linux\* Guest Kernel Security Specification
 #########################################################################
 
+Contributors:
+
+Andi Kleen
+Elena Reshetova
+
 Threat model
 ************
 
@@ -25,14 +30,14 @@ platform, the TDX module, and the SW stack running inside the TDX guest.
 
 The purpose of this document is to describe the security architecture of
 the Linux guest kernel running inside the TDX guest. The major security
-objectives of the TDX guest kernel security architecture are to prevent
+objectives of the TDX guest kernel security architecture are to help to prevent
 privilege escalation as well as kernel data confidentiality/integrity
 violations by the untrusted VMM. The denial-of-service (DoS) attacks
 towards the TDX guest kernel is out of the threat model’s scope since
 the TDX guest resources are fully under the control of the VMM and are
 able to perform DoS towards the TDX guest by default.
 
-The TDX module and the Intel platform ensure the protection of the TDX
+The TDX module and the Intel platform help ensure the protection of the TDX
 guest memory and registers. However, they cannot protect the TDX guest
 from host/VMM attacks that leverage existing communication interfaces
 between the host/VMM and the guest:
@@ -41,7 +46,7 @@ between the host/VMM and the guest:
 
 -  Shared memory for IO
 
-The primary goal of the security architecture described below is to
+The primary goal of the security architecture described below is to help to
 protect the TDX Linux guest kernel from attacks from the hypervisor
 through these communication interfaces. Additionally, there should not
 be any new additional attack vectors introduced towards the TDX Linux
@@ -63,10 +68,10 @@ from the untrusted host/VMM.
 1) TDX Linux guest kernel overall hardening methodology
 =======================================================
 
-Document [xxx] describes the hardening methodology that is used to
-perform systematic audits and fuzzing of the communication interfaces
-exposed to the malicious hypervisor. This document covers the kernel
-subsystems that are relevant to the described threat model and provides
+Document :ref:`tdx-guest-hardening describes the hardening methodology
+that is used to perform systematic audits and fuzzing of the communication
+interfaces exposed to the malicious hypervisor. This document covers the
+kernel subsystems that are relevant to the described threat model and provides
 details on their hardening principles. The overall security principle is
 that in case of any corruption event, the safest default option is to
 raise the kernel panic.
@@ -82,7 +87,9 @@ TDVMCALLs are proxied via the TDX module, only a small portion of them
 module. Most of the TDVMCALLs are passed through and their values are
 controlled by the host/VMM. Instead of inserting the TDVMCALL directly
 in many code paths within the guest kernel, a #VE handler is used as a
-centralized TDVMCALL invocation place. The #VE handler is invoked by the
+primary centralized TDVMCALL invocation place. However, for some cases
+TDVMCALL can be also invoked directly to boost the performance
+for a certain hot code path. The #VE handler is invoked by the
 TDX module for the actions it cannot handle. The #VE handler either
 decodes the executed instruction (using the standard Linux x86
 instruction decoder) and converts it into a TDVMCALL or rejects it
@@ -105,11 +112,10 @@ instruction decoder. We only care about users that read from MMIO.
 
 By default, all MMIO regions reside in the TDX guest private memory and
 are not accessible to the host/VMM. To explicitly share a MMIO region,
-the device must be authorized through the device filter frame work,
-which then calls ioremap\_driver\_hardened() from pci\_iomap() to set
-the EPT region as shared, enabling MMIO operations. The handling of the
+the device must be authorized through the device filter framework,
+enabling MMIO operations. The handling of the
 MMIO input from the untrusted host/VMM must be hardened (see
-Documentation [xxx] for more information).
+:ref:`tdx-guest-hardening for more information).
 
 The static code analysis tool should generate a list of all MMIO users
 based on use of the standard io.h macros. All portable code should use
@@ -123,8 +129,9 @@ should be able to find those using the \_\_iomem annotations.
 2.1.2) User MMIO
 ~~~~~~~~~~~~~~~~
 
-For TDX 1.0, user MMIO is not supported and results in SIGSEGV .
-Therefore, it cannot be used to attack the kernel (other than DoS).
+In the current Linux implementation user MMIO is not supported
+and results in SIGSEGV. Therefore, it cannot be used to attack
+the kernel (other than DoS).
 
 2.2) APIC
 ---------
@@ -191,7 +198,7 @@ drivers based on the information coming from the untrusted pci config
 space supplied by the host/VMM. Therefore, this allocation process needs
 to be verified to withstand the potential malicious input. As a result,
 the code in the core pci subsystem, as well as enabled virtio drivers
-have been audited and fuzzed using the techniques described in [xxx].
+have been audited and fuzzed using the techniques described in :ref:`tdx-guest-hardening`.
 Specifically, we paid attention to make sure that the allocated resource
 regions do not overlap with each other or with the rest of the TD guest
 memory. The pci bridge support is planned to be disabled for the TDX
@@ -216,9 +223,8 @@ will protect user programs to some degree. But it won’t protect programs
 that try to directly access devices that are on the allow list (like
 virtio or VMBus).
 
-The port IO access in user space is disallowed and results in SIGBUS.
-The MMIO accesses for user land are also initially not supported and
-will result in SIGSEGV (see `2.5) IO Ports`_ )
+Both MMIO and port IO access from the userspace is disallowed and
+results in SIGSEGV.
 
 It’s also possible, in principle, for programs to enumerate PCI directly
 through MMIO or CF8 port IO, which would circumvent the allow list.
@@ -240,20 +246,20 @@ There are two types of MSRs that are controlled by the TDX module:
    such an MSR (for example, all IA32\_VMX\_\* KVM MSRs).
 
 All these MSRs are controlled by the platform, are trusted, and do not
-require any hardening. See 16.1 in the TDX module EAS for the exact
+require any hardening. See 18.1 in https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf for the exact
 list.
 
 2.4.2) MSRs proxied through TDVMCALL and controlled by host
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This section refers to all the MSRs that are audited and fuzzed using
-the methodology described in the Document [xxx]. One of the main
+the methodology described in :ref:`tdx-guest-hardening`. One of the main
 concerns is MSRs with complex multi-bit fields that result in memory
 indexes. The other main concern is memory safety. The risk for
 individual MSR bits or MSRs that are only saved/restored is likely low,
 which covers a lot of MSRs. The full list of MSR accesses through the
 kernel codebase is generated by the static analysis approach, and is
-described in [xxx].
+described in :ref:`tdx-guest-hardening`.
 
 Nearly all MSRs used by the kernel are listed in
 arch/x86/include/asm/msr-index.h, but might have aliases and ranges.
@@ -274,7 +280,7 @@ respective code is hardened.
 IO ports are controlled by the host and could be an attack vector.
 
 All IO port accesses go through #VE or direct TDVMCALLs. We’ll use a
-small allow list of trusted ports. This prevents the host from trying to
+small allow list of trusted ports. This helps to prevent the host from trying to
 inject old ISA drivers that use port probing and might have
 vulnerabilities processing port data. While normally these cannot be
 auto loaded, they might be statically compiled into kernels and would do
@@ -369,7 +375,7 @@ filtered when TDX is active.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 These CPUIDs are disabled for now and potentially could be enabled after
-audit):
+audit:
 
  - KVM\_FEATURE\_MMU\_OP
  - KVM\_FEATURE\_STEAL\_TIME
@@ -393,7 +399,7 @@ audit):
 
 In theory, CPUID could be used to let the guest kernel execute
 non-hardened code paths. The TDX module ensures that most CPUID values
-are trusted (see 16.2 in the TDX module EAS), but some are configurable
+are trusted (see 18.2 in https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf), but some are configurable
 via the TD\_PARAMS structure or can be provided by the untrusted
 host/VMM via the logic implemented in #VE handler.
 
@@ -564,7 +570,7 @@ check that by using /proc/sys/kernel/taint. Additionally, there are
 warnings printed to indicate whenever the device filter has been
 disabled, overridden over command line, etc.
 
-The key server ensures through attestation that the guest runs in secure
+The key server helps to ensure through attestation that the guest runs in secure
 mode. It does that by attesting the kernel command line, as well as the
 kernel binary. The kernel configuration should include module signing,
 which can be enforced by the command line as well as the binary.
@@ -576,7 +582,9 @@ ACPI table mappings and similar table mappings use the ioremap\_cache
 interface, which is never set to shared with the untrusted host/VMM.
 
 ACPI tables are (mostly) controlled by the host and only passed through
-the TDVF. They should be attested and therefore trusted. However, we
+the TDVF (TDX guest virtual firmware,
+see https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.01.pdf for more information).
+They should be attested and therefore trusted. However, we
 cannot expect that an attesting entity fully understands what causes the
 Linux kernel to open security holes based on some particular AML. Then a
 malicious hypervisor might be able to attack the guest based on attack
@@ -661,9 +669,9 @@ section) happens in that window, it would allow a malicious userspace
 (ring 3) process in the guestto take over the guest kernel. As a result,
 it must be ensured that it is not possible to get a #VE event on the
 pages containing kernel code or data. For this reason, Linux guest
-kernel sets ATTRIBUTES.SEPT\_VE\_DISABLE TD attribute to 1 to prohibit
-the delivery of #VE exceptions when accessing a private GPA for which
-the Secure EPT entry state is PENDING.
+kernel verifies that ATTRIBUTES.SEPT\_VE\_DISABLE TD attribute is set
+to 1 to prohibit the delivery of #VE exceptions when accessing a private
+GPA for which the Secure EPT entry state is PENDING.
 
 8 Panic
 =======
@@ -688,7 +696,8 @@ This remains to be a direction for future work.
 9 Kernel and initrd loading
 ===========================
 
-The TDVF loads the kernel,the initrd, and a startup script from an
+In a simple reference configuration the TDVF loads the kernel,
+the initrd, and a startup script from an
 unencrypted UEFI VFAT volume in the guest storage area through virtio.
 The startup script contains the kernel command line. The kernel is
 booted through the Linux uEFI stub. Before booting the TDVF runs hashes
@@ -726,7 +735,7 @@ Users could use other encryption schemes for storage, such as not using
 LUKS but some other encrypted storage format. Alternatively, they could
 also not use local storage and rely on a volume mounted from the network
 after attesting themselves to the network server. However, support for
-such remote storage is out of the scope for now.
+such remote storage is out of the scope for this document for now.
 
 12 VirtIO and shared memory
 ===========================
@@ -734,7 +743,7 @@ such remote storage is out of the scope for now.
 The virtIO subsystem is controlled by the untrusted host/VMM. For the
 application data transferred over the virtIO communication channel, its
 confidentiality and integrity must be guaranteed by the
-application-level mechanisms .For example, virtio block IO is encrypted
+application-level mechanisms. For example, virtio block IO is encrypted
 and authenticated using dmcrypt or other similar mechanism, virtio
 network communication uses TLS or similar for the transmitted data. All
 the rest of virtio input received from the host/VMM must be considered
@@ -746,8 +755,8 @@ space and shared memory.
 The virtIO subsystem is also highly configurable with different options
 possible for the virtual queue's types, transportation, etc. For the
 virtual queues, currently the only mode that was hardened (by performing
-code audit and fuzzing activities outlined in [tbd]) is a split
-virtqueue without indirect descriptor support, so this mode is the only
+code audit and fuzzing activities outlined in :ref:`tdx-guest-hardening`)
+is a split virtqueue without indirect descriptor support, so this mode is the only
 one recommended for the secure virtio communication. For the virtio
 transportation, the Linux TDX guest kernel uses hardened virtio over PCI
 transport and disables the virtio over MMIO. If virtio over MMIO support
@@ -761,8 +770,9 @@ would open the unhardened code and is strongly discouraged.
 
 VirtIO drivers are built around the virtio ring. The ring contains
 descriptors, which are organized in a free list. The free list handling
-has been recently hardened to handle arbitrary corruptions. We assume
-the main attack point is the ring, but we also harden the higher-level
+has been recently hardened by moving out of the shared memory into
+guest private memory. We assume the main attack point is the ring,
+but we also harden the higher-level
 enabled drivers such as virtio-block, virtio-net, virtio-console,
 virtio-9p, and virtio-vsock. All other virtio drivers are disabled by
 the TDX guest driver filter and are not hardened.
@@ -775,8 +785,6 @@ used for auditing and injecting the fuzzing input. However, there still
 can be other accesses to the shared memory that must be manually audited
 and instrumented for fuzzing.
 
-Summary?
-
 13 Summary
 ==========
 
@@ -784,7 +792,7 @@ The TDX guest kernel security architecture described in this document is
 a first step towards building a secure Linux guest kernel for
 confidential cloud computing (CCC). The security hardening techniques
 described in this document are not specific to the Intel TDX technology,
-but are applicable for any CCC technology that aims to remove the
+but are applicable for any CCC technology that aims to help to remove the
 host/VMM from TCB. While some of the hardening approaches outlined above
 are still a work in progress or left for the future, it provides a solid
 foundation for continuing this work by both the industry and the Linux

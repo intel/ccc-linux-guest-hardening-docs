@@ -1,0 +1,1201 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Intel® Trust Domain Extension Guest Linux* Kernel Hardening Strategy &mdash; Intel® Trust Domain Extension</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Intel® Trust Domain Extension Linux* Guest Kernel Security Specification" href="security-spec.html" /> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Intel® Trust Domain Extension
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="security-spec.html">Intel® Trust Domain Extension Linux* Guest Kernel Security Specification</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Intel® Trust Domain Extension Guest Linux* Kernel Hardening Strategy</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#purpose-of-the-document-and-targeted-audience">1) Purpose of the document and targeted audience</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#hardening-strategy-overview">2) Hardening strategy overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#detailed-hardening-strategy">3) Detailed hardening strategy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#attack-surface-minimization">3.1) Attack surface minimization</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#implemented-filtering-mechanisms">Implemented filtering mechanisms</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#explicitly-disabled-functionality">Explicitly disabled functionality</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#opt-in-shared-mmio-regions-pci-config-space-access">Opt-in shared MMIO regions &amp; PCI config space access</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#static-code-analyzer-driven-manual-code-audit">3.2) Static code analyzer driven manual code audit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#requirements-and-goals">3.3) Requirements and goals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#check-host-input-smatch-pattern">3.4) Check_host_input smatch pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#performing-a-manual-code-audit">3.5) Performing a manual code audit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#applying-code-audit-results-to-different-kernel-trees">3.6) Applying code audit results to different kernel trees</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fuzzing">3.7) Fuzzing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#td-guest-kernel-runtime-fuzzing">3.8) TD guest kernel runtime fuzzing</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#fuzzing-stimulus">Fuzzing Stimulus</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#kf-x-fuzzer-for-virtio-dma-shared-memory">KF/x fuzzer for virtIO DMA shared memory</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#simple-blind-fuzzer-for-tdg-vp-vmcall-based-interfaces">Simple blind fuzzer for TDG.VP.VMCALL-based interfaces</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#kafl-fuzzer-for-tdg-vp-vmcall-based-interfaces-and-virtio-dma-shared-memory">kaFL fuzzer for TDG.VP.VMCALL-based interfaces and virtIO DMA shared memory</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#td-guest-kernel-boot-time-fuzzing">3.9) TD guest kernel boot time fuzzing</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id3">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id4">Details</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#how-to-run-workflow">How to run/ workflow</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#fuzzer-options">Fuzzer options</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#runtime-stimulus-fuzzing-with-kafl">3.10) Runtime / Stimulus Fuzzing with kAFL</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#basic-operation">3.10.1) Basic operation</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#id5">3.11) Basic operation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Intel® Trust Domain Extension</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Intel® Trust Domain Extension Guest Linux* Kernel Hardening Strategy</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/tdx-guest-hardening.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="intel-trust-domain-extension-guest-linux-kernel-hardening-strategy">
+<span id="tdx-guest-hardening"></span><h1>Intel® Trust Domain Extension Guest Linux* Kernel Hardening Strategy</h1>
+<p>Contributors:</p>
+<p>Elena Reshetova
+Tamas Lengyel
+Sebastian Osterlund
+Steffen Schulz</p>
+<div class="section" id="purpose-of-the-document-and-targeted-audience">
+<h2>1) Purpose of the document and targeted audience</h2>
+<p>The main security goal of Intel® Trust Domain Extension (Intel® TDX)
+technology is to remove the need for a guest VM to trust the host and
+Virtual Machine Manager (VMM). However, it cannot by itself protect the
+guest VM from host/VMM attacks that leverage existing paravirt-based
+communication interfaces between the host/VMM and the guest, such as
+MMIO, portIO, etc. To achieve protection against such attacks, the guest
+VM software stack needs to be hardened to securely handle an untrusted
+and potentially malicious input from a host/VMM via the above-mentioned
+interfaces. This hardening effort should be applied to a concrete set of
+software components that are used within the guest software stack
+(virtual BIOS, bootloader, Linux* kernel and userspace), which is
+specific to a concrete deployment scenario. To facilitate this process,
+we have developed a hardening methodology and tools that are explained
+below.</p>
+<p>The hardening approach presented in this document is by no means an
+ultimate guarantee of 100% security against the above-mentioned attacks,
+but merely a methodology built to our best knowledge and resource
+limitations. In our environment, we have successfully applied it to the
+Linux TDX MVP software stack (<a class="reference external" href="https://github.com/intel/tdx-tools">https://github.com/intel/tdx-tools</a>)
+to the trust domain (TD) guest Linux kernel and hardened many involved
+kernel subsystems. This guide is written with the Linux kernel in mind,
+but the outlined principles can be applied to any software component.</p>
+<p>The overall threat model and security architecture for the TD guest
+kernel is described in the <a class="reference internal" href="security-spec.html#security-spec"><span class="std std-ref">Intel® Trust Domain Extension Linux* Guest Kernel Security Specification</span></a> and it is
+recommended to be read together with this document.</p>
+</div>
+<div class="section" id="hardening-strategy-overview">
+<h2>2) Hardening strategy overview</h2>
+<p>The overall hardening strategy shown in Figure 1 encompasses three
+activities that are executed in parallel: attack surface minimization,
+manual code audit, and code fuzzing. All of them are strongly linked and
+the results from each activity are contributed as inputs to the other
+activities. For example, the results of a manual code audit can be used
+to decide whenever a certain feature should be disabled (attack surface
+minimization) or should be a target for a detailed fuzzing campaign.
+Similarly, the fuzzing results might affect the decision to disable a
+certain functionality or indicate a place where a manual code audit is
+required but have been missed by a static code analyzer.</p>
+<div class="figure" id="id6">
+<a class="reference internal image-reference" href="_images/strategy.png"><img alt="_images/strategy.png" src="_images/strategy.png" style="width: 5.51418in; height: 3.23958in;" /></a>
+<p class="caption"><span class="caption-text">Figure 1. Linux Guest kernel hardening strategy.</span></p>
+</div>
+<p>The following section provides a detailed description of each of these
+activities. An overall crucial aspect to consider is the “definition of
+done”, i.e., the criteria for when a hardening effort can be finished
+and how the success of such effort is defined.</p>
+<p>The ideal “definition of done” criteria can be outlined as follows:</p>
+<ol class="arabic simple">
+<li>The guest kernel functionality and the VMM/host exposed interfaces
+are limited to the minimum required for its successful operation,
+given a chosen deployment scenario. This implies that only a minimal
+set of required drivers, kernel subsystems, and individual
+functionality is enabled.</li>
+<li>All code paths that are enabled within the guest kernel and can take
+an untrusted input from VMM/host must be manually audited from the
+potential consequences of consuming the malformed data. Whenever a
+manual code audit identifies an issue that is a security concern, it
+must be addressed either by a bug fix or by disabling the involved
+code path, if possible.</li>
+<li>All code paths that are enabled within the guest kernel and can take
+an untrusted input from VMM/host must be fuzzed using an appropriate
+fuzzing technique. The fuzzing technique must provide the coverage
+information to identify that a fuzzer has reached the required code
+paths and exercised them sufficiently. Whenever the fuzzing activity
+identifies an issue that is a security concern, it must be addressed
+either by a bug fix or by disabling the involved code path.</li>
+</ol>
+<p>The success of the overall hardening effort is significantly more
+difficult to measure. The total number of security concerns identified
+by the manual code audit or fuzzing activity is a natural quantifier,
+but it neither guarantees that the end goal of having a secure guest
+kernel has been successfully reached nor does it necessarily indicate
+that the chosen hardening approach is successful. The successful
+operation of the guest kernel within the Linux TD software stack and the
+absence of issues identified or reported during its deployment lifecycle
+is a much stronger, albeit a post factum indicator.</p>
+</div>
+<div class="section" id="detailed-hardening-strategy">
+<h2>3) Detailed hardening strategy</h2>
+<div class="section" id="attack-surface-minimization">
+<h3>3.1) Attack surface minimization</h3>
+<p>The main objective for this task is to disable as much code as possible
+from the TD guest kernel to limit the number of interfaces exposed to
+the malicious host/VMM. This is achieved by either explicitly disabling
+certain unneeded features (for example early PCI code) , by a generic
+filtering approach, such as port IO filtering, driver filtering, etc or
+by restricting access to the MMIO and PCI config space regions</p>
+<div class="section" id="implemented-filtering-mechanisms">
+<h4>Implemented filtering mechanisms</h4>
+<p>All the implemented filtering mechanisms described below are runtime
+mechanisms that limit TD guest functionality based on a set of default
+allow lists defined in the kernel source code, but with a possibility to
+override these defaults via a command line option mechanism. The latter
+can be used for debugging purposes or for enabling a specific driver,
+ACPI table, or KVM CPUID functionality that is required for a particular
+deployment scenario.</p>
+<table border="1" class="colwidths-given docutils" id="id7">
+<caption><span class="caption-text">Filter status</span></caption>
+<colgroup>
+<col width="25%" />
+<col width="75%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Filter name</th>
+<th class="head">Purpose and current state</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>Driver filter</td>
+<td>Limits a set of drivers that are enabled in runtime for the TD guest kernel.
+By default, all PCI and ACPI bus drivers are blocked unless they are in the allow
+list. The current default allow list for the PCI bus is limited to the
+following virtio drivers: virtio_net, virtio_console, virtio_blk, and
+9pnet_virtio.</td>
+</tr>
+<tr class="row-odd"><td>Port IO filter</td>
+<td>Limits a set of IO ports that can be used for communication between a TD
+guest kernel and the host/VMM. This feature is needed in addition to the
+above driver filtering mechanism, because should some drivers escape this
+mechanism, its port IO communication with the host/VMM will be limited to a
+small set of allowed ports. For example, some linux drivers might perform
+port IO reads in their initialization functions before doing the driver
+registration or some legacy drivers might not utilize the modern driver
+registration interface at all and therefore would be allowed by the above
+driver filter. In any case port IO filter makes sure that only a limited
+number of ports are allowed to be communicating with host/VMM. The port IO
+allow list can be found in section 2.5) IO ports of
+<a class="reference internal" href="security-spec.html#security-spec"><span class="std std-ref">Intel® Trust Domain Extension Linux* Guest Kernel Security Specification</span></a> . Note that in the decompressed mode, the port IO
+filter is not active and therefore it is only applicable for early port IO
+and normal port IO.</td>
+</tr>
+<tr class="row-even"><td>ACPI table allow list</td>
+<td>TDX virtual firmware (TDVF, for details see
+<a class="reference external" href="https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.pdf">https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.pdf</a>)
+measures a set of ACPI tables obtained from the host/VMM into TDX RTMR[
+0] measurement register. Thus, the set of tables passed by the host/VMM can
+be remotely attested and verified. However, it can be difficult for a
+remote verifier to understand the possible consequences from using a big
+set of various ACPI tables. Since most of the tables are not needed for a
+TDX guest, the implemented ACPI table allow list limits them to a small,
+predefined list with a possibility to pass additional tables via a command
+line option. The current allow list is limited to the following tables:
+XSDT, FACP, DSDT, FACS, APIC, and SVKL. Note that a presence of a minimal
+ACPI table configuration does not by itself guarantee the overall security
+hardening of ACPI subsystem in the TD guest kernel. The known limitations
+on ACPI hardening are described in section 7 of <a class="reference internal" href="security-spec.html#security-spec"><span class="std std-ref">Intel® Trust Domain Extension Linux* Guest Kernel Security Specification</span></a>.</td>
+</tr>
+<tr class="row-odd"><td>KVM CPUID allow list and KVM hypercalls</td>
+<td>KVM supports a set of hypercalls that a TD guest kernel can request a VMM to
+perform. On x86, this set is defined by a set of exposed CPUID bits. Some
+of the hypercalls can result in untrusted data being passed from a VMM
+KVM) to the guest kernel. To limit this attack vector, the implemented KVM
+CPUID allow list restricts the available KVM CPUID bits to a small
+predefined allow list. More information can be found in sections 3.6 and
+3.7 of <a class="reference internal" href="security-spec.html#security-spec"><span class="std std-ref">Intel® Trust Domain Extension Linux* Guest Kernel Security Specification</span></a>.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="explicitly-disabled-functionality">
+<h4>Explicitly disabled functionality</h4>
+<p>Most of the functionality described below takes an untrusted host input
+via MSR, port IO, MMIO, or pci config space reads through its codebase.
+This has been identified using the static code analyzer described in the
+next section. The decision to disable this functionality was made based
+on the amount of code that would have to be manually audited, complexity
+of the code involved, as well as the fact that this functionality is not
+needed for the TD guest kernel.</p>
+<table border="1" class="colwidths-given docutils" id="id8">
+<caption><span class="caption-text">Features</span></caption>
+<colgroup>
+<col width="20%" />
+<col width="80%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Feature type</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>x86 features</td>
+<td>Some x86 feature bits are explicitly cleared out by the TD guest kernel
+during an initialization, such as X86_FEATURE_MCE, X86_FEATURE_MTRR,
+X86_FEATURE_TME, X86_FEATURE_APERFMPERF, X86_FEATURE_CQM_LLC.</td>
+</tr>
+<tr class="row-odd"><td>Various PCI functionality</td>
+<td>Some PCI related functionality that is not needed in the TD guest kernel is
+also explicitly disabled, such as early PCI, PCI quirks, and enhanced PCI
+parsing.</td>
+</tr>
+<tr class="row-even"><td>Miscellaneous</td>
+<td>A malicious host/VMM can fake PCI ids or some CPUID leaves to enable
+functionality that is normally disabled for a TDX guest and therefore not
+hardened. To help prevent this from happening, support for XEN, HyperV, and ACRN
+hypervisors, as well as AMD northbridge support, is explicitly disabled in
+the TD guest kernel.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="opt-in-shared-mmio-regions-pci-config-space-access">
+<h4>Opt-in shared MMIO regions &amp; PCI config space access</h4>
+<p>To further minimize the amount of code that needs to be hardened, we
+require the TD guest kernel to explicitly opt-in any MMIO region that
+needs to be shared with the host. This ensures that there is no
+accidental shared MMIO regions created in the TD guest kernel that can
+escape the hardening. A similar requirement applies to the PCI config
+space accesses: only authorized devices are allowed to perform PCI
+config space reads (this applies even to the PCI config space done from
+the device initialization routine).</p>
+</div>
+</div>
+<div class="section" id="static-code-analyzer-driven-manual-code-audit">
+<h3>3.2) Static code analyzer driven manual code audit</h3>
+</div>
+<div class="section" id="requirements-and-goals">
+<h3>3.3) Requirements and goals</h3>
+<p>The attack surface minimization activity outlined in the previous
+section helps to limit the amount of TD guest kernel code that actively
+interacts with the untrusted host/VMM. It is not possible to fully
+remove this interaction due to the functional requirements that the TD
+guest has; it needs to be able to perform network communication, it
+should be possible to interact with the TD guest via console, etc. Thus,
+we need to be able to manually audit all the TD guest kernel enabled
+code that consumes an untrusted input from the host/VMM to ensure it
+does not use this input in an unsecure way.</p>
+<p>To perform a more focused manual code audit, the exact locations where
+the untrusted host input is consumed by the TD guest kernel needs to be
+identified automatically. We have defined the following requirements for
+this process:</p>
+<ol class="arabic simple">
+<li><strong>Adjustability of custom kernel trees.</strong> The method must be easy to
+use on any custom kernel tree with any set of applied patches and
+specified kernel configuration.</li>
+<li><strong>Absence of code instrumentation.</strong> The expected number of locations
+where the TD guest can take an untrusted input from the host goes
+well beyond 1500 places even after the functionality minimization
+step. This makes it impossible to manually instrument these
+locations, as well as keep maintaining the instrumentation through
+the kernel version changes, custom patch sets, etc.</li>
+<li><strong>Open-source well established tool</strong>. The tool should be easily
+accessible for open source and for the kernel community to use and
+should be actively maintained and supported.</li>
+</ol>
+</div>
+<div class="section" id="check-host-input-smatch-pattern">
+<h3>3.4) Check_host_input smatch pattern</h3>
+<p>Based on the above requirements, a smatch static code analyzer
+(<a class="reference external" href="http://smatch.sourceforge.net/">http://smatch.sourceforge.net/</a>) has
+been chosen since it provides an easy interface to write custom patterns
+to search for problematic locations in the kernel source tree. Smatch
+already has a big set of existing patterns that have been used to find
+many security issues with the current mainline kernel.</p>
+<p>To identify the locations where a TD guest kernel can take an untrusted
+input from the host/VMM, a custom smatch pattern check_host_input has
+been written. It operates based on a list of “host input functions”. The list
+contains known, low-level functions that perform MSR, port IO, and MMIO
+reads, such as native_read_msr, inb/w/l, readb/w/l, as well as
+higher-level wrappers specific to certain subsystems. For example, PCI
+config space uses many wrappers like pci_read_config,
+pci_bus/user_read_* through its code paths to read the information
+from the untrusted host/VMM. The output of the check_host_input
+pattern when run against the whole kernel tree is a list of findings
+with exact code locations and some additional information to assist the
+manual code audit process.</p>
+<p>The current approach using the check_host_input smatch pattern has
+several limitations. The main limitation is the importance of having a
+correct list of input functions since the pattern will not detect the
+invocations of functions not present in this list. Fortunately, the
+low-level functions for performing MSR, port IO, and MMIO read
+operations are well defined in the Linux kernel. The higher-level
+wrappers can be identified by using an iterative approach: run the
+check_host_input smatch pattern to find all invocations of the
+low-level functions. By looking at these invocations, you can determine
+the next level wrappers, add them to the input function list, and re-run
+the smatch pattern again. Another limitation of this approach is the
+inability to detect generic DMA-style memory accesses, since they
+typically do not use any specific functions or wrappers to receive the
+data from the host/VMM. An exception here is a virtIO ring subsystem
+that uses virtio16/32/64_to_cpu wrappers in most of the places to
+access memory locations residing in virtIO ring DMA pages. The
+invocation of these wrappers can be detected by the check_host_input
+smatch pattern and the findings can be reported similarly as for other
+non-DMA accesses.</p>
+<div class="highlight-shell"><div class="highlight"><pre><span></span>arch/x86/pci/irq.c:1201 pirq_enable_irq<span class="o">()</span> warn:
+<span class="o">{</span><span class="m">9123410094849481700</span><span class="o">}</span><span class="nb">read</span> from the host using <span class="k">function</span>
+<span class="s1">&#39;pci_read_config_byte&#39;</span> to an int <span class="nb">type</span> <span class="nb">local</span> variable <span class="s1">&#39;pin&#39;</span>, <span class="nb">type</span> is
+uchar<span class="p">;</span>
+
+arch/x86/pci/irq.c:1216 pirq_enable_irq<span class="o">()</span> error:
+<span class="o">{</span><span class="m">11769853683657473858</span><span class="o">}</span>Propagating an expression containing a tainted
+value from the host <span class="s1">&#39;pin - 1&#39;</span> into a <span class="k">function</span>
+<span class="s1">&#39;IO_APIC_get_PCI_irq_vector&#39;</span><span class="p">;</span>
+
+arch/x86/pci/irq.c:1228 pirq_enable_irq<span class="o">()</span> error:
+<span class="o">{</span><span class="m">15187152360757797804</span><span class="o">}</span>Propagating a tainted value from the host <span class="s1">&#39;pin&#39;</span>
+into a <span class="k">function</span> <span class="s1">&#39;pci_swizzle_interrupt_pin&#39;</span><span class="p">;</span>
+
+arch/x86/pci/irq.c:1229 pirq_enable_irq<span class="o">()</span> error:
+<span class="o">{</span><span class="m">8593519367775469163</span><span class="o">}</span>Propagating an expression containing a tainted
+value from the host <span class="s1">&#39;pin - 1&#39;</span> into a <span class="k">function</span>
+<span class="s1">&#39;IO_APIC_get_PCI_irq_vector&#39;</span><span class="p">;</span>
+
+arch/x86/pci/irq.c:1233 pirq_enable_irq<span class="o">()</span> warn:
+<span class="o">{</span><span class="m">3245640912980979571</span><span class="o">}</span>Propagating an expression containing a tainted
+value from the host <span class="s1">&#39;65 + pin - 1&#39;</span> into a <span class="k">function</span> <span class="s1">&#39;_dev_warn&#39;</span><span class="p">;</span>
+
+arch/x86/pci/irq.c:1243 pirq_enable_irq<span class="o">()</span> warn:
+<span class="o">{</span><span class="m">11844818720957432302</span><span class="o">}</span>Propagating an expression containing a tainted
+value from the host <span class="s1">&#39;65 + pin - 1&#39;</span> into a <span class="k">function</span> <span class="s1">&#39;_dev_info&#39;</span><span class="p">;</span>
+
+arch/x86/pci/irq.c:1262 pirq_enable_irq<span class="o">()</span> warn:
+<span class="o">{</span><span class="m">14811741117821484023</span><span class="o">}</span>Propagating an expression containing a tainted
+value from the host <span class="s1">&#39;65 + pin - 1&#39;</span> into a <span class="k">function</span> <span class="s1">&#39;_dev_warn&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Figure 2. Sample output from the check_host_input smatch pattern.</p>
+<p>The sample output of the check_host_input smatch pattern is shown on
+Figure 2. The function pirq_enable_irq performs a PCI config space
+read operation using a pci_read_config_byte input function (PCI
+config space specific higher-level wrapper) and stores the result in the
+local variable pin (type uchar). Next, this local variable is being
+supplied as an argument to the IO_APIC_get_PCI_irq_vector and
+pci_swizzle_interrupt_pin functions, as well as to several
+_dev_info/warn functions. The relevant code snippet with highlighted
+markings is shown in Figure 3.</p>
+<p>The check_host_input smatch pattern attempts to to provide a rough
+indication of severity for each finding via “warn” or “error” keywords
+highlighted in grey in Figure 2. Whenever a host input is being used as
+a condition for iteration, assigned to an external variable, returned by
+function, or being passed as an argument to a different generic
+function, the pattern reports such cases as “error” conditions. However,
+if the host input is being passed to a “safe output function” like
+various debug output, MSR, port IO, or MMIO write functions, the pattern
+reports such cases as “warn” conditions. Similarly, “warn” status is
+given to the cases when a function to obtain the host input is invoked,
+but its result is either not stored at all or used in a boolean
+expression to select one of the following code paths. The underlying
+idea behind the severity status is an attempt to assist the manual code
+audit process to indicate the code locations where the possibility of
+finding a security issue is higher. However, in its current form, it is
+strongly recommended to check both “warn” and “error” findings to make
+sure every single code path is secure.</p>
+<div class="figure">
+<a class="reference internal image-reference" href="_images/code-snipped-pirq.png"><img alt="_images/code-snipped-pirq.png" src="_images/code-snipped-pirq.png" style="width: 6.14865in; height: 5.68750in;" /></a>
+</div>
+<p>Figure 3. Code snippet for the pirq_enable_irq function.</p>
+</div>
+<div class="section" id="performing-a-manual-code-audit">
+<h3>3.5) Performing a manual code audit</h3>
+<p>When a manual code audit activity is performed, the list of smatch
+findings is first filtered using the process_smatch_output.py python
+script to discard the results for the areas that are disabled within the
+TD guest kernel. For example, most of the drivers/* and sound/*
+results are filtered out except for the drivers that are enabled in the
+TD guest kernel.</p>
+<p>Next, the reduced list of smatch pattern findings can be analyzed
+manually by looking at each reported code location and verifying that
+the consumed host input is used in a secure way.</p>
+<p>Each finding is therefore manually classified into one of the following
+statuses:</p>
+<table border="1" class="colwidths-given docutils" id="id9">
+<caption><span class="caption-text">Findings</span></caption>
+<colgroup>
+<col width="20%" />
+<col width="80%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head"><strong>Status</strong></th>
+<th class="head"><strong>Meaning</strong></th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>excluded</td>
+<td>This code location is not reachable inside a TD guest due to it being
+non-Intel code or functionality that is disabled for the TD guest kernel.
+The reason these lines are not filtered from the smatch report by the above
+process_smatch_output.py python script is additional checks that we do
+when executing the fuzzing activity described in the next section. We
+perform an additional verification that none of these excluded code
+locations can be reached by the fuzzer.</td>
+</tr>
+<tr class="row-odd"><td>unclassified</td>
+<td>This code location is reachable inside TDX guest (i.e. not excluded), but
+has not been manually audited yet.</td>
+</tr>
+<tr class="row-even"><td>wrapper</td>
+<td>The function that consumed a host input is a higher-level wrapper. The
+function is being checked for processing the host input in a secure way,
+but additionally all its callers are also reported by the smatch pattern
+and the code audit happens on each caller.</td>
+</tr>
+<tr class="row-odd"><td>safe</td>
+<td>The consumed host input looks to be used in a secure way</td>
+</tr>
+<tr class="row-even"><td>concern</td>
+<td>The consumed host input is used in an unsecure way. There is an additional
+comment indicating the exact reason. All concern items must be addressed
+either by disabling the code that performs the host input processing or by
+writing a patch that fixes the problematic input processing.</td>
+</tr>
+</tbody>
+</table>
+<p>The main challenge in this process is a decision whenever a certain
+reported code location is considered “safe” or “concern”. The typical
+list of “concern” items can be classified into two categories:</p>
+<ol class="arabic simple">
+<li><strong>Memory access issues</strong>. A host input is being used as an address,
+pointer, buffer index, loop iterator bound or anything else that
+might result in the host/VMM being able to have at least partial
+control over the memory access that a TD guest kernel performs.</li>
+<li><strong>Conceptual security issues.</strong> A host input is being used to affect
+the overall security of the TD guest or its features. An example is
+when an untrusted host input is used for operating TD guest clock or
+affecting KASLR randomization.</li>
+</ol>
+</div>
+<div class="section" id="applying-code-audit-results-to-different-kernel-trees">
+<h3>3.6) Applying code audit results to different kernel trees</h3>
+<p>The provided list at <a class="reference external" href="https://github.com/intel/ccc-linux-guest-hardening/tree/master/audit/sample_output/5.15-rc1">https://github.com/intel/ccc-linux-guest-hardening/tree/master/audit/sample_output/5.15-rc1</a>
+of smatch findings for the version 5.15-rc1 kernel
+contains results of our manual code audit activity for this kernel
+(Please note that the provided list
+does not have ‘safe’ or ‘concern’ markings published) and
+can be used as a baseline for performing a manual audit on other kernel
+versions or on custom vendor kernels. Here is the suggested procedure:</p>
+<ol class="arabic">
+<li><p class="first">Run the provided check_host_input smatch pattern on a desired
+target kernel tree:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span><span class="nb">cd</span> kernel_build_directory
+
+~/smatch/smatch_scripts/test_kernel.sh
+</pre></div>
+</div>
+<p>Smatch stores results in smatch_warns.txt in the root of the kernel
+build directory.</p>
+</li>
+<li><p class="first">Process the smatch_warns.txt output using process_smatch_output.py
+python script. If any additional drivers or subsystems are enabled,
+the script can be easily modified not to filter these results from
+the output by adding them into tdx_allowed_drivers list.</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>python3 process_smatch_output.py smatch_warns.txt
+</pre></div>
+</div>
+<p>The output file of this step, smatch_warns.txt_filtered, is a reduced
+list of check_host_input smatch findings for a target kernel tree.
+This file should have all the relevant findings that should be
+manually audited.</p>
+</li>
+<li><p class="first">Transfer existing manual code audit results from the provided source
+kernel tree results to the target kernel by running the
+transfer_results.py script.</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>python3 transfer_results.py existing_smatch_audit_results
+filtered_smatch_warns
+</pre></div>
+</div>
+</li>
+</ol>
+<p>The script produces three output files with the *_results_new,
+*_results_old and *_results_analyzed postfixes. The
+*_results_old file contains the manual code audit results that are
+matching between the existing_smatch_audit_results and the
+filtered_smatch_warns. These results do not have to be manually
+re-audited since the code in question has not changed.</p>
+<p>The *_results_new file contains the results that were impossible to
+automatically transfer due to one of the following reasons:</p>
+<ol class="arabic simple">
+<li>The code location is new in the target kernel tree and has not been
+part of the previous analysis done for the source kernel tree.</li>
+<li>The code location has existed before and has been manually audited,
+but there are some code changes between the target and source kernel
+trees that require manual re-auditing to confirm the status of the
+finding (i.e., “safe”, “concern”, etc.)</li>
+</ol>
+<p>The reported code locations in the *_results_new file must be
+manually audited following the logic described in section 3.2.3. The
+*_results_analyzed file is a combination of the *_results_new and
+the *_results_old file with all the entries arranged in the order of
+static analysis scan.</p>
+<p>The manual code audit results that were obtained by executing the
+transfer_results.py script are automatically transferred based on the
+unique identifiers for each finding. Examples of these findings are
+shown in orange in Figure 2. Identifiers from a source kernel tree
+finding and target tree finding must match for a finding to be
+automatically transferred. An identifier is a simple djb2 hash of
+an analyzed code expression together with a relative offset from the
+beginning of the function where this expression is located. It is
+possible to further improve the calculation of identifiers (and
+therefore improve the accuracy of automatic result transfer) to include
+the code around the expression in a way that it is done in various
+version control systems, but it has not been done yet.</p>
+</div>
+<div class="section" id="fuzzing">
+<h3>3.7) Fuzzing</h3>
+<p>Fuzzing is a well-established software validation technique that can be
+used to find problems in input handling of various software components.
+In our TD guest kernel hardening project, we used it to validate and
+cross check the results from the manual code audit activity described in
+section 3.2.</p>
+<p>The main goals for the fuzzing activity are:</p>
+<ol class="arabic simple">
+<li>Automatically exercise the robustness of the existing TD guest kernel
+code that was identified by the smatch pattern as handling the input
+from the host/VMM.</li>
+<li>Identify new TD guest kernel code locations that handle the input
+from the host/VMM and were missed by the smatch pattern (for example
+some virtIO DMA accesses). When such locations are identified, the
+smatch pattern can be further improved to catch these and similar
+places in other parts of the kernel code.</li>
+<li>Automatically verify that the code that is expected to be disabled in
+the TD guest kernel (and thus not manually audited at all) is indeed
+not executed/not reachable in practice.</li>
+</ol>
+<p>To select an appropriate fuzzing tool or set of tools for the above
+goals, we have divided the fuzzing activity into two primary directions
+based on the type of fuzzing stimulus that they require: <em>boot time
+fuzzing</em> and <em>runtime fuzzing</em>.</p>
+</div>
+<div class="section" id="td-guest-kernel-runtime-fuzzing">
+<h3>3.8) TD guest kernel runtime fuzzing</h3>
+<p>The primary ways of consuming untrusted host/VMM input during TD guest
+runtime is via TDVMCALLs, as well as DMA shared memory that is used by
+virtIO layer. For fuzzing the DMA shared memory, the KF/x fuzzer
+approach is used and described in section 3.3.2. For the TDVMCALL-based
+interfaces, we use kAFL fuzzer described in section 3.3.4, which is
+built on the fuzzing injection hooks provided by the simple blind TD
+fuzzer described in section 3.3.3.</p>
+<div class="section" id="fuzzing-stimulus">
+<h4>Fuzzing Stimulus</h4>
+<p>The biggest challenge with the TD guest runtime fuzzing is to create an
+appropriate stimulus for the fuzzing process, i.e. to find a way to
+repeatedly invoke the desired code paths in the TD guest kernel that
+handle an input from the host/VMM. Without such stimulus, it is hard to
+create good fuzzing coverage even for the code locations reported by the
+smatch static analyzer pattern described in section 3.2.2. When it comes
+to the possible stimulus options, the following has been considered:</p>
+<ul class="simple">
+<li><strong>Write a set of dedicated tests that exercises the desired code
+paths</strong>. The obvious downside of this approach is that it is very
+labor-intensive and manual. Also, the smatch static analyzer list of
+findings goes well beyond 1500 unique entries; this approach does not
+scale since some of the tests might have to be modified manually as
+the mainline Linux kernel keeps developing.</li>
+<li><strong>Use existing test suites for kernel subsystems.</strong> This approach
+works well for the cases when a certain type of operation is known to
+eventually trigger an input from the host/VMM. Examples include Linux
+Test Project (LTP), as well as networking and filesystem test suites
+(netperf, stress-ng). The challenge here is to identify test programs
+that trigger all the desired code paths. Todo: put a coverage info +
+refer to section for usermode tracing/fuzzing for how to find/test
+own stimulus.</li>
+<li><strong>Automatically produced stimulus corpus.</strong> An alternative way of
+using existing test suites or creating new ones can be a method that
+would programmatically exercise the existing TD guest kernel runtime
+code paths and produce a set of programs that allow invocation of the
+paths that lead to obtaining an unput from the host/VMM. Fortunately,
+the Linux kernel has a well-known tool for exercising the kernel in
+runtime – syzkaller fuzzer. While being a fuzzing tool that was
+originally created to test the robustness of ring3 to ring0
+interfaces, syzkaller fuzzer can be used to automatically generate a
+set of stimulus programs once it is modified to understand whenever a
+code path that triggers an input from the host/VMM is invoked.
+However, the biggest problem with using syzkaller in this way is to
+create a bias towards executing syscalls that would end up consuming
+the input from the host/VMM. This remains a direction for future
+research.</li>
+</ul>
+</div>
+<div class="section" id="kf-x-fuzzer-for-virtio-dma-shared-memory">
+<h4>KF/x fuzzer for virtIO DMA shared memory</h4>
+<div class="section" id="overview">
+<h5>Overview</h5>
+<p>DMA shared memory is designed to be accessible by the host hypervisor to
+facilitate fast I/O operations. DMA is setup using the Linux kernel’s
+DMA API and the allocated memory regions are then used by various
+drivers to facilitate I/O for disk, network, and console connections via
+the VirtIO protocol. The goal of using the KF/x fuzzer on these DMA
+memory regions is to identify issues in these drivers and the VirtIO
+protocol that may lead to security issues.</p>
+<p>To fuzz the code that interacts with DMA memory, do the following:</p>
+<ol class="arabic simple">
+<li>Capture VM snapshot when DMA memory read access is performed</li>
+<li>Transfer VM snapshot to KF/x fuzzing host</li>
+<li>Identify stop-point in the snapshot</li>
+<li>Fuzz target using KF/x</li>
+</ol>
+<div class="figure" id="id10">
+<a class="reference internal image-reference" href="_images/kf-x-overview.png"><img alt="_images/kf-x-overview.png" src="_images/kf-x-overview.png" style="width: 5.86458in; height: 3.29883in;" /></a>
+<p class="caption"><span class="caption-text">Figure 4. KF/x overview</span></p>
+</div>
+</div>
+<div class="section" id="details">
+<h5>Details</h5>
+<ol class="upperalpha">
+<li><p class="first">As the memory underpinning DMA is regular RAM, the guest-physical
+address is bound to run through the MMU’s Second Layer Address
+Translation via the Extended Page Tables (EPT). This allows us to
+restrict the EPT permissions and remove read-access rights from the VM.
+By removing EPT access rights of the memory regions designated to be
+DMA, the hypervisor gets a page-fault notification of all code-locations
+that interact with DMA memory. The <a class="reference external" href="https://github.com/kvm-vmi">Bitdefender KVM VMI
+patch-set</a> is used for this
+introspection.</p>
+<p>DMA regions are identified by hooking the Linux kernel’s DMA API via
+hypervisor-level breakpoint injection. By injecting a breakpoint into
+the DMA API responsible for mapping and unmapping memory, we can track
+which memory pages are designated to be DMA. The VM is booted with this
+monitoring enabled from the start and the EPT permissions are
+automatically restricted for all pages that are currently DMA mapped.</p>
+<p>As DMA accesses are very frequent, the number of snapshots taken are
+reduced by observing the call-stack leading to the DMA access. For this,
+the kernel is compiled with stack frame pointers enabled. By hashing the
+four top-level functions on the call-stack, we identify whether a given
+DMA access is performed under a unique context or not (such as a
+particular system-call, kernel thread, etc.).</p>
+<p>The faulting instruction is then emulated by the hypervisor to allow the
+DMA access to continue without the kernel getting stuck trying to access
+memory.</p>
+</li>
+<li><p class="first">Snapshots are transferred to KF/x fuzzing hosts running on Xen.
+Snapshots are loaded into VM-shells by transplanting the snapshots’
+memory and vCPU context.</p>
+</li>
+<li><p class="first">The transplanted snapshot is executed up to a limited number of
+instructions (usually between 100k-250k) and logged to a file.
+Cross-reference the log with stacktrace to see how far back up the stack
+the execution reached. Place a breakpoint at that address.</p>
+</li>
+<li><p class="first">KF/x is set up to fuzz the entire DMA page (4096 bytes) where the
+memory access was captured. The fuzzer is set to log any fuzzed input
+that leads to KASAN, UBSAN, or panic in the VM.</p>
+</li>
+</ol>
+</div>
+<div class="section" id="setup-instructions">
+<h5>Setup instructions</h5>
+<p><a class="reference external" href="https://github.com/intel/kernel-fuzzer-for-xen-project/wiki/Virtio-snapshotting-with-KVM-VMI">Virtio snapshotting with KVM VMI · intel/kernel-fuzzer-for-xen-project
+Wiki
+(github.com)</a></p>
+</div>
+</div>
+<div class="section" id="simple-blind-fuzzer-for-tdg-vp-vmcall-based-interfaces">
+<h4>Simple blind fuzzer for TDG.VP.VMCALL-based interfaces</h4>
+<p>This simple fuzzer defines the basic fuzzer structure and the fuzzing
+injection input hooks that can be used by more advanced fuzzers (and in
+our case, used by the kAFL fuzzer) to supply the fuzzing input to the TD
+guest kernel. The fuzzing input is consumed using the tdx_fuzz function
+that is called right after the input has been consumed from the host
+using the <strong>TDG.VP.VMCALL</strong> CPU interface.</p>
+<p>The fuzzing input that is used by the basic fuzzer is a simple mutation
+using random values and shifts of the actual supplied input from the
+host/VMM. The algorithm to produce the fuzzing input can be found in
+__tdx_fuzz from arch/x86/kernel/tdx-fuzz.c. The main limitation of
+this fuzzing approach is an absence of any feedback during the fuzzing
+process, as well as an inability to recover from kernel crashes or
+hangs.</p>
+</div>
+<div class="section" id="kafl-fuzzer-for-tdg-vp-vmcall-based-interfaces-and-virtio-dma-shared-memory">
+<h4>kaFL fuzzer for TDG.VP.VMCALL-based interfaces and virtIO DMA shared memory</h4>
+<p>Initially, we adopted kAFL Fuzzer [github.com/IntelLabs/kAFL] for
+effective runtime feedback fuzzing of the <strong>TDG.VP.VMCALL</strong>-based
+interfaces; later on, we extended it to cover some of the virtIO shared
+memory DMA-based interfaces. However, the coverage of DMA-based
+interfaces is only limited to the usage of virtio
+virtio16/32/64_to_cpu wrappers described in section 3.2 due to the
+usage of fuzz injection input hooks that have been added to these
+wrappers.</p>
+<div class="section" id="id1">
+<h5>Overview</h5>
+<div class="figure" id="id11">
+<a class="reference internal image-reference" href="_images/kAFL-runtime-overview.png"><img alt="_images/kAFL-runtime-overview.png" src="_images/kAFL-runtime-overview.png" style="width: 3.60417in; height: 3.98958in;" /></a>
+<p class="caption"><span class="caption-text">Figure 5. [kAFL runtime fuzzing overview. 1) start of fuzzing 2)
+input fuzz buffer from host 3) stimulus is consumed from userspace
+4) MSR/PIO/MMIO causes a #VE 5) the agent injects a value obtained
+from 6) the input buffer 7) finally, reporting back the status to
+the host (crash/ hang/ ok)]</span></p>
+</div>
+<p>While kAFL can work based on binary rewrite and traps, the more
+flexible approach is to modify the target’s source code. This
+implementsg an agent that directly hooks relevant subsystems and
+low-level input functions and feeds fuzzing input. At a high level,
+our agent implementation consists of three parts:</p>
+<ol class="loweralpha simple">
+<li><strong>Core agent logic</strong>: This includes fuzzer initialization and helper
+functions for logging and debug. The fuzzer is initialized with
+tdg_fuzz_enable(), and accepts control input via tdg_fuzz_event()
+to start/stop/pause input injection or report an error event.
+<a class="reference external" href="https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/guest/-/blob/kafl/fuzz-11/arch/x86/kernel/tdx-fuzz-kafl.c">https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/guest/-/blob/kafl/fuzz-11/arch/x86/kernel/tdx-fuzz-kafl.c</a>
+TODO: put a link to external commit</li>
+<li><strong>Input hooks</strong>: We currently leverage the tdx_fuzz guest kernel
+hooks the same as ‘simple fuzzer’ described in section 3.3.3. If
+enabled, the agent’s implementation of tdx_fuzz()sequentially
+consumes inputs from an internally maintained payload buffer. Fuzzing
+stops when the buffer is fully consumed or other exit conditions are
+met.
+<a class="reference external" href="https://gitlab.devtools.intel.com/tdx/guest/-/commit/0d5cd17f4537dbc185d647f6e80b6ab22098cf99">https://gitlab.devtools.intel.com/tdx/guest/-/commit/0d5cd17f4537dbc185d647f6e80b6ab22098cf99</a>
+TODO: put a link to external commit when available</li>
+<li><strong>Exit and reporting hooks</strong>: We added tdx_fuzz_event() calls to
+common error handlers such as panic() and kasan_report(), but also
+halt_loop() macros etc. Moreover, the printk subsystem has been
+modified to log buffers directly via hypercalls. This allows report
+error conditions to be returned to the fuzzer and to collect any
+diagnostics before immediately restoring the initial snapshot for
+next execution.</li>
+</ol>
+<p>As with the other runtime fuzzing setups, the kAFL setup requires an
+adequate “stimulus” to trigger kernel code paths that consume data from
+the untrusted host/VMM (either using <strong>TDG.VP.VMCALL</strong>-based interface
+or virtIO DMA shared memory). We setup kAFL to run any desired userspace
+binaries as stimulus input, using a flexible bash script to initialize
+snapshotting + stimulus execution from /sbin/binit.</p>
+</div>
+<div class="section" id="id2">
+<h5>Setup instructions</h5>
+<p>tbd</p>
+</div>
+</div>
+</div>
+<div class="section" id="td-guest-kernel-boot-time-fuzzing">
+<h3>3.9) TD guest kernel boot time fuzzing</h3>
+<p>A successful boot-time fuzzing requires many repetitions of the boot
+process. These repetitions act as a stimulus to trigger the kernel boot
+code paths where a TD guest kernel obtains the input from the host/VMM.
+The invocation of these code paths is usually hard to achieve in runtime
+after the kernel has already booted due to absence of re-initialization
+paths for many of these kernel subsystems. Moreover, injecting invalid
+inputs at boot time will often lead to unrecoverable but benign error
+situations, causing significant delays with typical testing approaches.</p>
+<p>As described in section 3.3.4, we have adopted the kAFL Fuzzer
+[github.com/IntelLabs/kAFL] for effective feedback fuzzing of the Linux
+bootstrapping phase. Using a combination of fast VM snapshots and kernel
+hooks, kAFL allows flexible harnessing of the relevant kernel
+sub-systems and automated reporting and recovery from typical error
+conditions such as panic() or KASAN handlers.</p>
+<div class="section" id="id3">
+<h4>Overview</h4>
+<div class="figure" id="id12">
+<a class="reference internal image-reference" href="_images/kAFL-overview.png"><img alt="_images/kAFL-overview.png" src="_images/kAFL-overview.png" style="width: 3.48364in; height: 3.73366in;" /></a>
+<p class="caption"><span class="caption-text">Figure 6. [kAFL overview. 1) start of fuzzing (entry to kernel) 2)
+fuzzing harness 3) input fuzz buffer from host 4) MSR/PIO/MMIO causes a
+#VE 5) the agent injects a value obtained from 6) the input buffer 7)
+finally, reporting back the status to the host (crash/ hang/ ok)]</span></p>
+</div>
+<p>Similar to the kAFL runtime setup, the boot-time kAFL fuzzer uses the
+tdx_fuzz() hook to inject fuzzing input for the bulk of low-level
+accessor functions. Additional hooks may be required to cover MMIO using
+custom access functions (e.g., VirtIO) as well as DMA. These are not
+currently fully covered by the current kAFL agent (see limitations
+described in section 3.3.4).</p>
+</div>
+<div class="section" id="id4">
+<h4>Details</h4>
+<p>Our kAFL agent implements a number of harnesses covering key phases of boot:</p>
+<ul class="simple">
+<li>Early boot process: EARLYBOOT, POST_TRAP, and START_KERNEL</li>
+<li>Subsystem initialization: REST_INIT, DO_BASIC, DOINITCALLS,
+DOINITCALLS_PCI, DOINITCALLS_VIRTIO, DOINITCALLS_ACPI, and
+DOINITCALLS_LEVEL_X</li>
+<li>Full boot (ends just before dropping to userspace): FULL_BOOT</li>
+<li>Kretprobe-based single function harnesses: VIRTIO_CONSOLE_INIT and
+EARLY_PCI_SERIAL_INIT</li>
+</ul>
+<p>These harnesses are enabled in the guest Linux kernel by setting up the
+kernel build configuration parameters in such a way that the desired
+harness is enabled. For example, set
+CONFIG_TDX_FUZZ_HARNESS_EARLYBOOT=y to enable the EARLYBOOT harness.
+When enabled, the kernel will execute a tdx_fuzz_enable() call at the
+beginning of the harness and a corresponding end call at the end of the
+harness. These calls cause kAFL to take a snapshot at the first fuzzing
+input consumed in the harness, and to reset the snapshot once the
+execution reaches the end of the harness. The fuzzer will continue
+resetting the snapshot in a loop – having it consume different fuzzing
+input on each reset – until the fuzzing campaign is terminated.</p>
+<p>During the campaign, the fuzzer automatically logs error cases, such as
+crashes, sanitizer violations, or timeouts. Detailed (binary edge)
+traces and kernel logs can be extracted in post-processing runs
+(coverage gathering). To understand the effectiveness of a campaign, we
+map achieved code coverage to relevant guest input cases identified in
+the smatch report (see X.Y) (smatch matching).</p>
+<p>Example output?</p>
+<p>For further usage info check tool-specific documentation/guidance at
+tbd.</p>
+</div>
+<div class="section" id="how-to-run-workflow">
+<h4>How to run/ workflow</h4>
+<p>Running a boot time fuzzing campaign using our kAFL-based setup
+typically consists of three stages, namely:</p>
+<ol class="arabic">
+<li><p class="first"><strong>Run fuzzing campaign(s).</strong> Here we run the fuzzing campaign itself.
+The duration of the campaign typically depends on which harness is
+being used, how much parallelism can be used, etc. We have included a
+script (fuzz.sh)that sets up a campaign with some default settings.
+Make sure the guest kernel with the kAFL agent is checked out in
+~/tdx/linux-guest. Select a harness that you want to use for fuzzing
+(in the next examples we will use the DOINITCALLS_LEVEL_4 harness).
+Using our fuzz.sh script, you can run a campaign in the following
+manner:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>~/tdx/bkc/kafl/fuzz.sh full ~/tdx/linux-guest
+</pre></div>
+</div>
+<p>This starts a single fuzzing campaign, with the settings specified
+in fuzz.sh. You can get a more detailed view of the status of the
+campaign using the kafl_gui.py tool:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>python3 ~/nyx/kAFL-Fuzzer/kafl_gui.py /dev/shm/<span class="nv">$USER_tdfl</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first"><strong>Gather the line coverage.</strong> Once the campaign has run for long
+enough, we can extract the code line coverage from the campaign’s
+produced fuzzing corpus.</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>~/tdx/bkc/kafl/fuzz.sh cov /dev/shm/<span class="nv">$USER</span><span class="se">\_</span>tdfl
+</pre></div>
+</div>
+<p>This produces output files in the /dev/shm/$USER_tdfl/traces
+directory, containing information, such as the line coverage (for
+example, see the file traces/addr2line.lst).</p>
+</li>
+<li><p class="first"><strong>Match coverage against smatch report.</strong> Finally, to get an idea of
+what the campaign has covered, we provide some functionality to
+analyze the obtained line coverage against the smatch report. Using
+the following command, you can generate a file
+(traces/smatch_match.lst) containing the lines from the smatch
+report that the current fuzzing campaign has managed to reach. Run
+the smatch analysis using:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>~/tdx/bkc/kafl/fuzz.sh smatch /dev/shm/<span class="nv">$USER_tdfl</span>
+</pre></div>
+</div>
+<p>For a more complete mapping of the PT trace to line coverage, we
+have included functionality to augment the line coverage with
+information obtained using Ghidra. For example, if you want to make
+sure that code lines in in-lined functions are also considered, run
+the previous command, but set the environmental variable
+USE_GHIDRA=1. E.g.:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span><span class="nv">USE_GHIDRA</span><span class="o">=</span><span class="m">1</span> ~/tdx/bkc/kafl/fuzz.sh smatch /dev/shm/<span class="nv">$USER_tdfl</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>We have included a script run_experiments.py that automatically runs
+these three steps for all the different relevant boot time harnesses.</p>
+</div>
+<div class="section" id="fuzzer-options">
+<h4>Fuzzer options</h4>
+<div class="section" id="logging-crashes">
+<h5>Logging crashes</h5>
+<p>Some crashes found in the kernel might not be easily/deterministically
+reproducible just based on the fuzzing input. We have included a flag
+–log_crashes, which always logs the kernel log in case a crash is
+detected. To run a campaign with this enabled:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>~/tdx/bkc/kafl/fuzz.sh full ~/tdx/linux-guest --log_crashes
+</pre></div>
+</div>
+<p>This creates a folder called ‘logs/’ containing such log files in your
+fuzzer workdir (/dev/shm/$USER_tdfl).</p>
+</div>
+<div class="section" id="full-logs">
+<h5>Full logs</h5>
+<p>Sometimes you might want the full logs for the whole campaign. In such
+cases, use the –log_hprintf flag. This creates log files called
+hprintf_XX.log (where XX is the worker id) in your fuzzer workdir.</p>
+</div>
+<div class="section" id="single-function-harnesses">
+<h5>Single function harnesses</h5>
+<p>You can enable a single function harness by setting the
+‘fuzzer_func_harness=my_function’ kernel boot parameter in our guest
+kernel. For example, to fuzz the function acpi_init, setup your guest
+kernel to use the NONE harness by building the kernel with the following
+build config: CONFIG_TDX_FUZZ_HARNESS_NONE=y. After building the
+kernel you start up the fuzzing campaign with a single function target:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span><span class="nv">KERNEL_BOOT_PARAMS</span><span class="o">=</span>”fuzzer_func_harness<span class="o">=</span>acpi_init” <span class="se">\\</span>
+~/tdx/bkc/kafl/fuzz.sh full ~/tdx/linux-guest
+</pre></div>
+</div>
+</div>
+<div class="section" id="extra-fuzzing-hooks">
+<h5>Extra fuzzing hooks</h5>
+<p>Some points where we want to inject fuzzer input do not cause a #VE
+(e.g., VirtIO DMA memory). We can optionally enable fuzzing of VirtIO
+DMA reads by setting the kernel config parameter
+“CONFIG_TDX_FUZZ_KAFL_VIRTIO”. This enables the fuzzing hooks for
+virtioXX_to_cpu(), allowing the fuzzer to inject input whenever these
+wrappers are called.</p>
+</div>
+</div>
+</div>
+<div class="section" id="runtime-stimulus-fuzzing-with-kafl">
+<h3>3.10) Runtime / Stimulus Fuzzing with kAFL</h3>
+<p>The kAFL agent implemented in [refer boot-time kAFL fuzzer] can also be
+used to trace and fuzz custom stimulus programs from userspace. The kAFL
+setp for userspace fuzzing uses to following additional components:</p>
+<ul class="simple">
+<li>kAFL agent exposes a userspace interface via debugfs. The interface
+offers similar controls to those used to implement boot-time harneses
+inside the kernel, i.e. start/stop as well as basic statistics.</li>
+<li>The VM must be started with a valid rootfs, such as an initrd that
+contains the stimulus program. The kernel is configured with
+CONFIG_TDX_FUZZ_HARNESS_NONE; it boots normally and launches the
+designated ‘init’ process. Fuzzer configuration and control is done
+via debugfs.</li>
+<li>To avoid managing a large range of filesystems, kAFL offers a
+‘-sharedir’ option that allows to download files into the guest at
+runtime. This way, the rootfs only contains a basic loader while
+actual execution is driven by scripts and programs on the Host.
+Communication is done using hypercalls and works independently of
+virtio or other guest drivers.</li>
+</ul>
+<div class="section" id="basic-operation">
+<h4>3.10.1) Basic operation</h4>
+<p>The usermode harness that is downloaded and launched by the loader can
+be any script or binary and may also act as an intermediate loader or
+even compiler of further input. The main difference from regular VM
+userspace is that the harness eventually enables the fuzzer, at which
+point the kAFL/Qemu frontend creates the initial VM snapshot and
+provides a first candidate payload to the kAFL agent. Once the snapshot
+loop has started, execution is traced for coverage feedback and the
+userspace is fully reset after timeout, crashes, or when the “done”
+event is signaled via debugfs.</p>
+</div>
+</div>
+<div class="section" id="id5">
+<h3>3.11) Basic operation</h3>
+<div class="figure" id="id13">
+<a class="reference internal image-reference" href="_images/example-harness.png"><img alt="_images/example-harness.png" src="_images/example-harness.png" style="width: 5.00000in; height: 3.48958in;" /></a>
+<p class="caption"><span class="caption-text">Example harness (downloaded and launched from initrd/launcher):</span></p>
+</div>
+<p>Detailed setup and scripts to generate small rootfs/initrd:
+<a class="reference external" href="https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/bkc/-/tree/fuzzers-2/kafl/userspace">https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/bkc/-/tree/fuzzers-2/kafl/userspace</a></p>
+<p>More sophisticated “harness” for randomized stimulus execution:
+<a class="reference external" href="https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/bkc/-/blob/fuzzers-2/kafl/userspace/sharedir_template/init.sh">https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/bkc/-/blob/fuzzers-2/kafl/userspace/sharedir_template/init.sh</a></p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="security-spec.html" class="btn btn-neutral" title="Intel® Trust Domain Extension Linux* Guest Kernel Security Specification" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018, BSD, MIT, Apache and GPL licenses.
+      Last updated on Mar 17, 2022.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.1',
+            LANGUAGE:'None',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          
+          SphinxRtdTheme.Navigation.enableSticky();
+          
+      });
+  </script> 
+
+</body>
+</html>

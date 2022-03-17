@@ -196,7 +196,7 @@
 Elena Reshetova</p>
 <div class="section" id="threat-model">
 <h2>Threat model</h2>
-<div class="figure" id="id5">
+<div class="figure" id="id1">
 <a class="reference internal image-reference" href="_images/linux-tdx-sw-stack.png"><img alt="_images/linux-tdx-sw-stack.png" src="_images/linux-tdx-sw-stack.png" style="width: 3.63944in; height: 3.65625in;" /></a>
 <p class="caption"><span class="caption-text">Figure 1. Linux TDX 1.0 SW stack</span></p>
 </div>
@@ -245,7 +245,7 @@ kernel printout and debug routines that can now take parameters directly
 from the untrusted host/VMM.</p>
 <div class="section" id="tdx-linux-guest-kernel-overall-hardening-methodology">
 <h3>1) TDX Linux guest kernel overall hardening methodology</h3>
-<p>Document :ref:<a href="#id1"><span class="problematic" id="id2">`</span></a>tdx-guest-hardening describes the hardening methodology
+<p>Document <a class="reference internal" href="tdx-guest-hardening.html#tdx-guest-hardening"><span class="std std-ref">Intel® Trust Domain Extension Guest Linux* Kernel Hardening Strategy</span></a> describes the hardening methodology
 that is used to perform systematic audits and fuzzing of the communication
 interfaces exposed to the malicious hypervisor. This document covers the
 kernel subsystems that are relevant to the described threat model and provides
@@ -287,7 +287,7 @@ are not accessible to the host/VMM. To explicitly share a MMIO region,
 the device must be authorized through the device filter framework,
 enabling MMIO operations. The handling of the
 MMIO input from the untrusted host/VMM must be hardened (see
-:ref:<a href="#id3"><span class="problematic" id="id4">`</span></a>tdx-guest-hardening for more information).</p>
+<a class="reference internal" href="tdx-guest-hardening.html#tdx-guest-hardening"><span class="std std-ref">Intel® Trust Domain Extension Guest Linux* Kernel Hardening Strategy</span></a> for more information).</p>
 <p>The static code analysis tool should generate a list of all MMIO users
 based on use of the standard io.h macros. All portable code should use
 these macros. The only known exception to this is the MMIO APIC direct
@@ -440,7 +440,7 @@ standard port probing.</p>
 we only have the virtio console.</p>
 <p>The table below shows the allow list ports in the current TDX guest
 kernel:</p>
-<table border="1" class="colwidths-given docutils" id="id6">
+<table border="1" class="colwidths-given docutils" id="id2">
 <caption><span class="caption-text">List ports</span></caption>
 <colgroup>
 <col width="29%" />
@@ -504,7 +504,7 @@ Documentation/virt/kvm/hypercalls.rst for detailed specifications.</p>
 filtered when TDX is active.</p>
 <div class="section" id="unsafe-cpuids">
 <h5>2.7.1) Unsafe CPUIDs</h5>
-<table border="1" class="colwidths-given docutils" id="id7">
+<table border="1" class="colwidths-given docutils" id="id3">
 <caption><span class="caption-text">Unsafe CPUIDs</span></caption>
 <colgroup>
 <col width="27%" />
@@ -577,7 +577,7 @@ registers and can be attested later, the CPUID bits that are configured
 using this structure can be considered trusted.</p>
 <p>The table below lists the CPUID leaves that can be supplied by the
 untrusted Host/VMM:</p>
-<table border="1" class="colwidths-given docutils" id="id8">
+<table border="1" class="colwidths-given docutils" id="id4">
 <caption><span class="caption-text">CPUID leaves</span></caption>
 <colgroup>
 <col width="20%" />

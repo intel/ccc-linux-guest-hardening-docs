@@ -152,8 +152,8 @@ deployment scenario.
        filter is not active and therefore it is only applicable for early port IO
        and normal port IO.
    * - ACPI table allow list
-     - TDX virtual firmware (TDVF, for details see 
-      https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.pdf)
+     - TDX virtual firmware (TDVF, for details see
+       https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.pdf)
        measures a set of ACPI tables obtained from the host/VMM into TDX RTMR[
        0] measurement register. Thus, the set of tables passed by the host/VMM can
        be remotely attested and verified. However, it can be difficult for a

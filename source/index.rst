@@ -1,7 +1,7 @@
 .. Intel® Trust Domain Extension documentation master file.
 
-Intel® Trust Domain Extension Documentation
-###########################################
+Intel® Trust Domain Extension Guest Kernel Hardening Documentation
+##################################################################
 
 .. toctree::
    :maxdepth: 2

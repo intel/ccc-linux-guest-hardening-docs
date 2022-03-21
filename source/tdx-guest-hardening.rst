@@ -737,10 +737,10 @@ this fuzzing approach is an absence of any feedback during the fuzzing
 process, as well as an inability to recover from kernel crashes or
 hangs.
 
-kaFL fuzzer for TDG.VP.VMCALL-based interfaces and virtIO DMA shared memory
+kAFL fuzzer for TDG.VP.VMCALL-based interfaces and virtIO DMA shared memory
 ---------------------------------------------------------------------------
 
-Initially, we adopted kAFL Fuzzer [github.com/IntelLabs/kAFL] for
+Initially, we adopted `kAFL Fuzzer <https://github.com/IntelLabs/kAFL>`__ for
 effective runtime feedback fuzzing of the **TDG.VP.VMCALL**-based
 interfaces; later on, we extended it to cover some of the virtIO shared
 memory DMA-based interfaces. However, the coverage of DMA-based
@@ -756,15 +756,15 @@ Overview
    :width: 3.60417in
    :height: 3.98958in
 
-   Figure 5. [kAFL runtime fuzzing overview. 1) start of fuzzing 2)
+   Figure 5. kAFL runtime fuzzing overview. 1) start of fuzzing 2)
    input fuzz buffer from host 3) stimulus is consumed from userspace
    4) MSR/PIO/MMIO causes a #VE 5) the agent injects a value obtained
    from 6) the input buffer 7) finally, reporting back the status to
-   the host (crash/ hang/ ok)]
+   the host (crash/ hang/ ok)
 
 While kAFL can work based on binary rewrite and traps, the more
 flexible approach is to modify the target’s source code. This
-implementsg an agent that directly hooks relevant subsystems and
+implements an agent that directly hooks relevant subsystems and
 low-level input functions and feeds fuzzing input. At a high level,
 our agent implementation consists of three parts:
 
@@ -772,8 +772,7 @@ a. **Core agent logic**: This includes fuzzer initialization and helper
    functions for logging and debug. The fuzzer is initialized with
    tdg\_fuzz\_enable(), and accepts control input via tdg\_fuzz\_event()
    to start/stop/pause input injection or report an error event.
-   https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/guest/-/blob/kafl/fuzz-11/arch/x86/kernel/tdx-fuzz-kafl.c
-   TODO: put a link to external commit
+   https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-3/arch/x86/kernel/kafl-agent.c
 
 b. **Input hooks**: We currently leverage the tdx\_fuzz guest kernel
    hooks the same as ‘simple fuzzer’ described in section 3.3.3. If
@@ -781,8 +780,7 @@ b. **Input hooks**: We currently leverage the tdx\_fuzz guest kernel
    consumes inputs from an internally maintained payload buffer. Fuzzing
    stops when the buffer is fully consumed or other exit conditions are
    met.
-   https://gitlab.devtools.intel.com/tdx/guest/-/commit/0d5cd17f4537dbc185d647f6e80b6ab22098cf99
-   TODO: put a link to external commit when available
+   https://github.com/IntelLabs/kafl.linux/commit/1e5206fbd6a3050c4b812a826de29982be7a5905
 
 c. **Exit and reporting hooks**: We added tdx\_fuzz\_event() calls to
    common error handlers such as panic() and kasan\_report(), but also
@@ -802,7 +800,8 @@ snapshotting + stimulus execution from /sbin/binit.
 Setup instructions
 ~~~~~~~~~~~~~~~~~~
 
-tbd
+The full setup instructions for our kAFL-based fuzzing setup can be found at
+https://github.com/intel/ccc-linux-guest-hardening
 
 3.9) TD guest kernel boot time fuzzing
 ======================================
@@ -816,8 +815,8 @@ paths for many of these kernel subsystems. Moreover, injecting invalid
 inputs at boot time will often lead to unrecoverable but benign error
 situations, causing significant delays with typical testing approaches.
 
-As described in section 3.3.4, we have adopted the kAFL Fuzzer
-[github.com/IntelLabs/kAFL] for effective feedback fuzzing of the Linux
+As described in section 3.3.4, we have adopted the `kAFL Fuzzer
+<https://github.com/IntelLabs/kAFL>`__ for effective feedback fuzzing of the Linux
 bootstrapping phase. Using a combination of fast VM snapshots and kernel
 hooks, kAFL allows flexible harnessing of the relevant kernel
 sub-systems and automated reporting and recovery from typical error
@@ -830,10 +829,10 @@ Overview
    :width: 3.48364in
    :height: 3.73366in
 
-   Figure 6. [kAFL overview. 1) start of fuzzing (entry to kernel) 2)
+   Figure 6. kAFL overview. 1) start of fuzzing (entry to kernel) 2)
    fuzzing harness 3) input fuzz buffer from host 4) MSR/PIO/MMIO causes a
    #VE 5) the agent injects a value obtained from 6) the input buffer 7)
-   finally, reporting back the status to the host (crash/ hang/ ok)]
+   finally, reporting back the status to the host (crash/ hang/ ok)
 
 Similar to the kAFL runtime setup, the boot-time kAFL fuzzer uses the
 tdx\_fuzz() hook to inject fuzzing input for the bulk of low-level
@@ -858,6 +857,9 @@ Our kAFL agent implements a number of harnesses covering key phases of boot:
 -  Kretprobe-based single function harnesses: VIRTIO\_CONSOLE\_INIT and
    EARLY\_PCI\_SERIAL\_INIT
 
+The full list of boot harnesses with descriptions is available at
+https://github.com/intel/ccc-linux-guest-hardening/blob/master/docs/boot_harnesses.txt
+
 These harnesses are enabled in the guest Linux kernel by setting up the
 kernel build configuration parameters in such a way that the desired
 harness is enabled. For example, set
@@ -875,12 +877,10 @@ crashes, sanitizer violations, or timeouts. Detailed (binary edge)
 traces and kernel logs can be extracted in post-processing runs
 (coverage gathering). To understand the effectiveness of a campaign, we
 map achieved code coverage to relevant guest input cases identified in
-the smatch report (see X.Y) (smatch matching).
-
-Example output?
+the smatch report (see 3.3) (smatch matching).
 
 For further usage info check tool-specific documentation/guidance at
-tbd.
+https://github.com/intel/ccc-linux-guest-hardening/
 
 How to run/ workflow
 --------------------
@@ -891,7 +891,7 @@ typically consists of three stages, namely:
 #. **Run fuzzing campaign(s).** Here we run the fuzzing campaign itself.
    The duration of the campaign typically depends on which harness is
    being used, how much parallelism can be used, etc. We have included a
-   script (fuzz.sh)that sets up a campaign with some default settings.
+   script (fuzz.sh) that sets up a campaign with some default settings.
    Make sure the guest kernel with the kAFL agent is checked out in
    ~/tdx/linux-guest. Select a harness that you want to use for fuzzing
    (in the next examples we will use the DOINITCALLS\_LEVEL\_4 harness).
@@ -900,7 +900,7 @@ typically consists of three stages, namely:
 
    .. code-block:: bash
 
-      ~/tdx/bkc/kafl/fuzz.sh full ~/tdx/linux-guest
+      ./fuzz.sh full linux-guest
 
    This starts a single fuzzing campaign, with the settings specified
    in fuzz.sh. You can get a more detailed view of the status of the
@@ -908,7 +908,7 @@ typically consists of three stages, namely:
 
    .. code-block:: bash
 
-      python3 ~/nyx/kAFL-Fuzzer/kafl_gui.py /dev/shm/$USER_tdfl
+      python3 kafl/kafl_gui.py /dev/shm/$USER_tdfl
 
 #. **Gather the line coverage.** Once the campaign has run for long
    enough, we can extract the code line coverage from the campaign’s
@@ -916,7 +916,7 @@ typically consists of three stages, namely:
 
    .. code-block:: bash
 
-      ~/tdx/bkc/kafl/fuzz.sh cov /dev/shm/$USER\_tdfl
+      ./fuzz.sh cov /dev/shm/$USER\_tdfl
 
    This produces output files in the /dev/shm/$USER\_tdfl/traces
    directory, containing information, such as the line coverage (for
@@ -932,7 +932,7 @@ typically consists of three stages, namely:
 
    .. code-block:: bash
 
-      ~/tdx/bkc/kafl/fuzz.sh smatch /dev/shm/$USER_tdfl
+      ./fuzz.sh smatch /dev/shm/$USER_tdfl
 
    For a more complete mapping of the PT trace to line coverage, we
    have included functionality to augment the line coverage with
@@ -943,9 +943,9 @@ typically consists of three stages, namely:
 
    .. code-block:: bash
 
-      USE_GHIDRA=1 ~/tdx/bkc/kafl/fuzz.sh smatch /dev/shm/$USER_tdfl
+      USE_GHIDRA=1 ./fuzz.sh smatch /dev/shm/$USER_tdfl
 
-We have included a script run\_experiments.py that automatically runs
+We have included a script (`run\_experiments.py <https://github.com/intel/ccc-linux-guest-hardening/blob/master/bkc/kafl/run_experiments.py>`_) that automatically runs
 these three steps for all the different relevant boot time harnesses.
 
 Fuzzer options
@@ -956,12 +956,12 @@ Logging crashes
 
 Some crashes found in the kernel might not be easily/deterministically
 reproducible just based on the fuzzing input. We have included a flag
-–log\_crashes, which always logs the kernel log in case a crash is
+`-–log\_crashes`, which always logs the kernel log in case a crash is
 detected. To run a campaign with this enabled:
 
 .. code-block:: bash
 
-   ~/tdx/bkc/kafl/fuzz.sh full ~/tdx/linux-guest --log_crashes
+   ./fuzz.sh full linux-guest --log_crashes
 
 This creates a folder called ‘logs/’ containing such log files in your
 fuzzer workdir (/dev/shm/$USER\_tdfl).
@@ -970,7 +970,7 @@ Full logs
 ~~~~~~~~~
 
 Sometimes you might want the full logs for the whole campaign. In such
-cases, use the –log\_hprintf flag. This creates log files called
+cases, use the `-–log\_hprintf` flag. This creates log files called
 hprintf\_XX.log (where XX is the worker id) in your fuzzer workdir.
 
 Single function harnesses
@@ -986,7 +986,7 @@ kernel you start up the fuzzing campaign with a single function target:
 .. code-block:: bash
 
    KERNEL_BOOT_PARAMS=”fuzzer_func_harness=acpi_init” \\
-   ~/tdx/bkc/kafl/fuzz.sh full ~/tdx/linux-guest
+   ./fuzz.sh full ~/tdx/linux-guest
 
 Extra fuzzing hooks
 ~~~~~~~~~~~~~~~~~~~
@@ -1001,7 +1001,7 @@ wrappers are called.
 3.10) Runtime / Stimulus Fuzzing with kAFL
 ==========================================
 
-The kAFL agent implemented in [refer boot-time kAFL fuzzer] can also be
+The kAFL agent described in 3.9 can also be
 used to trace and fuzz custom stimulus programs from userspace. The kAFL
 setp for userspace fuzzing uses to following additional components:
 
@@ -1045,9 +1045,9 @@ event is signaled via debugfs.
    Example harness (downloaded and launched from initrd/launcher):
 
 Detailed setup and scripts to generate small rootfs/initrd:
-https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/bkc/-/tree/fuzzers-2/kafl/userspace
+https://github.com/intel/ccc-linux-guest-hardening/tree/master/bkc/kafl/userspace
 
 More sophisticated “harness” for randomized stimulus execution:
-https://gitlab.devtools.intel.com/icri-fuzzing/tdfl/bkc/-/blob/fuzzers-2/kafl/userspace/sharedir_template/init.sh
+https://github.com/intel/ccc-linux-guest-hardening/tree/master/bkc/kafl/userspace/sharedir_template/init.sh
 
 

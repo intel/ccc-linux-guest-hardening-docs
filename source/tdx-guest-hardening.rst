@@ -11,8 +11,8 @@ Sebastian Osterlund
 Steffen Schulz
 
 
-1) Purpose of the document and targeted audience
-************************************************
+Purpose and Scope
+=================
 
 The main security goal of Intel® Trust Domain Extension (Intel® TDX)
 technology is to remove the need for a guest VM to trust the host and
@@ -42,8 +42,8 @@ The overall threat model and security architecture for the TD guest
 kernel is described in the :ref:`security-spec` and it is
 recommended to be read together with this document.
 
-2) Hardening strategy overview
-******************************
+Hardening strategy overview
+===========================
 
 The overall hardening strategy shown in Figure 1 encompasses three
 activities that are executed in parallel: attack surface minimization,
@@ -100,11 +100,8 @@ operation of the guest kernel within the Linux TD software stack and the
 absence of issues identified or reported during its deployment lifecycle
 is a much stronger, albeit a post factum indicator.
 
-3) Detailed hardening strategy
-******************************
-
-3.1) Attack surface minimization
-================================
+Attack surface minimization
+===========================
 
 The main objective for this task is to disable as much code as possible
 from the TD guest kernel to limit the number of interfaces exposed to
@@ -147,8 +144,8 @@ deployment scenario.
        registration interface at all and therefore would be allowed by the above
        driver filter. In any case port IO filter makes sure that only a limited
        number of ports are allowed to be communicating with host/VMM. The port IO
-       allow list can be found in section 2.5) IO ports of
-       :ref:`security-spec` . Note that in the decompressed mode, the port IO
+       allow list can be found in :ref:`sec-io-ports`.
+       Note that in the decompressed mode, the port IO
        filter is not active and therefore it is only applicable for early port IO
        and normal port IO.
    * - ACPI table allow list
@@ -165,15 +162,15 @@ deployment scenario.
        XSDT, FACP, DSDT, FACS, APIC, and SVKL. Note that a presence of a minimal
        ACPI table configuration does not by itself guarantee the overall security
        hardening of ACPI subsystem in the TD guest kernel. The known limitations
-       on ACPI hardening are described in section 7 of :ref:`security-spec`.
+       on ACPI hardening are described in :ref:`sec-acpi-tables`.
    * - KVM CPUID allow list and KVM hypercalls
      - KVM supports a set of hypercalls that a TD guest kernel can request a VMM to
        perform. On x86, this set is defined by a set of exposed CPUID bits. Some
        of the hypercalls can result in untrusted data being passed from a VMM
        KVM) to the guest kernel. To limit this attack vector, the implemented KVM
        CPUID allow list restricts the available KVM CPUID bits to a small
-       predefined allow list. More information can be found in sections 3.6 and
-       3.7 of :ref:`security-spec`.
+       predefined allow list. More information can be found in
+       :ref:`sec-kvm-hypercalls` and :ref:`sec-kvm-cpuid`.
 
 Explicitly disabled functionality
 ---------------------------------
@@ -219,11 +216,13 @@ space accesses: only authorized devices are allowed to perform PCI
 config space reads (this applies even to the PCI config space done from
 the device initialization routine).
 
-3.2) Static code analyzer driven manual code audit
-==================================================
+.. _hardening-smatch-report:
 
-3.3) Requirements and goals
-===========================
+Static Analyzer and Code Audit
+==============================
+
+Requirements and goals
+----------------------
 
 The attack surface minimization activity outlined in the previous
 section helps to limit the amount of TD guest kernel code that actively
@@ -255,8 +254,8 @@ this process:
    accessible for open source and for the kernel community to use and
    should be actively maintained and supported.
 
-3.4) Check\_host\_input smatch pattern
-======================================
+Check\_host\_input smatch pattern
+---------------------------------
 
 Based on the above requirements, a smatch static code analyzer
 (http://smatch.sourceforge.net/) has
@@ -297,47 +296,6 @@ access memory locations residing in virtIO ring DMA pages. The
 invocation of these wrappers can be detected by the check\_host\_input
 smatch pattern and the findings can be reported similarly as for other
 non-DMA accesses.
-
-.. I left the following block in place because it has escaped underscores,
-.. which is the correct procedure for ReST. However, when using the code-block
-.. directive, backslashes are displayed instead of being interpreted.
-.. Since it is tedious to replace backslashes to escape the underscores and
-.. I was uncertain if the team wants to display this example output in a
-.. code-block, I retained the escaped version of the content and commented out
-.. the entire block. Remove this block if the second code block below is
-.. acceptable.
-
-   arch/x86/pci/irq.c:1201 pirq\_enable\_irq() warn:
-   {9123410094849481700}read from the host using function
-   'pci\_read\_config\_byte' to an int type local variable 'pin', type is
-   uchar;
-
-   arch/x86/pci/irq.c:1216 pirq\_enable\_irq() error:
-   {11769853683657473858}Propagating an expression containing a tainted
-   value from the host 'pin - 1' into a function
-   'IO\_APIC\_get\_PCI\_irq\_vector';
-
-   arch/x86/pci/irq.c:1228 pirq\_enable\_irq() error:
-   {15187152360757797804}Propagating a tainted value from the host 'pin'
-   into a function 'pci\_swizzle\_interrupt\_pin';
-
-   arch/x86/pci/irq.c:1229 pirq\_enable\_irq() error:
-   {8593519367775469163}Propagating an expression containing a tainted
-   value from the host 'pin - 1' into a function
-   'IO\_APIC\_get\_PCI\_irq\_vector';
-
-   arch/x86/pci/irq.c:1233 pirq\_enable\_irq() warn:
-   {3245640912980979571}Propagating an expression containing a tainted
-   value from the host '65 + pin - 1' into a function '\_dev\_warn';
-
-   arch/x86/pci/irq.c:1243 pirq\_enable\_irq() warn:
-   {11844818720957432302}Propagating an expression containing a tainted
-   value from the host '65 + pin - 1' into a function '\_dev\_info';
-
-   arch/x86/pci/irq.c:1262 pirq\_enable\_irq() warn:
-   {14811741117821484023}Propagating an expression containing a tainted
-   value from the host '65 + pin - 1' into a function '\_dev\_warn';
-
 
 .. code-block:: shell
 
@@ -408,8 +366,10 @@ sure every single code path is secure.
 
 Figure 3. Code snippet for the pirq\_enable\_irq function.
 
-3.5) Performing a manual code audit
-===================================
+.. _hardening-performing-manual-audit:
+
+Performing a manual code audit
+------------------------------
 
 When a manual code audit activity is performed, the list of smatch
 findings is first filtered using the process\_smatch\_output.py python
@@ -471,8 +431,8 @@ list of “concern” items can be classified into two categories:
    affecting KASLR randomization.
 
 
-3.6) Applying code audit results to different kernel trees
-==========================================================
+Applying code audit results to different kernel trees
+-----------------------------------------------------
 
 The provided list at https://github.com/intel/ccc-linux-guest-hardening/tree/master/audit/sample_output/5.15-rc1
 of smatch findings for the version 5.15-rc1 kernel
@@ -536,8 +496,9 @@ automatically transfer due to one of the following reasons:
    finding (i.e., “safe”, “concern”, etc.)
 
 The reported code locations in the \*\_results\_new file must be
-manually audited following the logic described in section 3.2.3. The
-\*\_results\_analyzed file is a combination of the \*\_results\_new and
+manually audited following the logic described in
+:ref:`hardening-performing-manual-audit`.
+The \*\_results\_analyzed file is a combination of the \*\_results\_new and
 the \*\_results\_old file with all the entries arranged in the order of
 static analysis scan.
 
@@ -554,14 +515,13 @@ therefore improve the accuracy of automatic result transfer) to include
 the code around the expression in a way that it is done in various
 version control systems, but it has not been done yet.
 
-3.7) Fuzzing
-============
+TD Guest Fuzzing
+================
 
 Fuzzing is a well-established software validation technique that can be
 used to find problems in input handling of various software components.
 In our TD guest kernel hardening project, we used it to validate and
-cross check the results from the manual code audit activity described in
-section 3.2.
+cross check the results from the manual code audit activity.
 
 The main goals for the fuzzing activity are:
 
@@ -579,32 +539,205 @@ The main goals for the fuzzing activity are:
    the TD guest kernel (and thus not manually audited at all) is indeed
    not executed/not reachable in practice.
 
-To select an appropriate fuzzing tool or set of tools for the above
-goals, we have divided the fuzzing activity into two primary directions
-based on the type of fuzzing stimulus that they require: *boot time
-fuzzing* and *runtime fuzzing*.
+The primary ways of consuming untrusted host/VMM is by using either TDVMCALLs or
+DMA shared memory as used for example by the VirtIO layer. Additionally, the
+code paths that consume untrusted input may invoked automatically during boot,
+or require some additional stimulus to execute during runtime.
 
-3.8) TD guest kernel runtime fuzzing
-====================================
+In the following we review options we considered for generating potential
+relevant userspace activity and fuzzing the various relevant input interfaces
+during boot as well as during runtime.
 
-The primary ways of consuming untrusted host/VMM input during TD guest
-runtime is via TDVMCALLs, as well as DMA shared memory that is used by
-virtIO layer. For fuzzing the DMA shared memory, the KF/x fuzzer
-approach is used and described in section 3.3.2. For the TDVMCALL-based
-interfaces, we use kAFL fuzzer described in section 3.3.4, which is
-built on the fuzzing injection hooks provided by the simple blind TD
-fuzzer described in section 3.3.3.
+
+Fuzzing Kernel Boot
+===================
+
+The majority of input points identified by smatch analysis and manual audit are
+invoked as part of kernel boot.
+The invocation of these code paths is usually hard to achieve at runtime
+after the kernel has already booted due to absence of re-initialization
+paths for many of these kernel subsystems.
+
+We have adopted the `kAFL Fuzzer
+<https://github.com/IntelLabs/kAFL>`__ for effective feedback fuzzing of the Linux
+bootstrapping phase. Using a combination of fast VM snapshots and kernel
+hooks, kAFL allows flexible harnessing of the relevant kernel
+sub-systems, fast recovery from beningn error conditions, and automated
+reporting of any desired errors and exceptions handlers.
+
+.. figure:: images/kAFL-overview.png
+   :width: 3.48364in
+   :height: 3.73366in
+
+   Figure 4. kAFL overview. 1) start of fuzzing (entry to kernel) 2)
+   fuzzing harness 3) input fuzz buffer from host 4) MSR/PIO/MMIO causes a
+   #VE 5) the agent injects a value obtained from 6) the input buffer 7)
+   finally, reporting back the status to the host (crash/hang/ok)
+
+Agent
+-------
+
+While kAFL can work based on binary rewrite and traps, the more
+flexible approach is to modify the target’s source code. This
+implements an agent that directly hooks relevant subsystems and
+low-level input functions and feeds fuzzing input. At a high level,
+our agent implementation consists of three parts:
+
+a. **Core agent logic**: This includes fuzzer initialization and helper
+   functions for logging and debug. The fuzzer is initialized with
+   tdg\_fuzz\_enable(), and accepts control input via tdg\_fuzz\_event()
+   to start/stop/pause input injection or report an error event.
+   https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-3/arch/x86/kernel/kafl-agent.c
+
+b. **Input hooks**: We leverage the tdx\_fuzz hooks of in the
+   guest kernel as defined by `Simple Fuzzer Hooks`_ as well as
+   virtio16/32/64\_to\_cpu wrappers for VirtIO DMA input.
+   When enabled, the fuzzing hooks are implemented to sequentially
+   consume input from a payload buffer maintained by the agent. Fuzzing
+   stops when the buffer is fully consumed or other exit conditions are
+   met.
+   https://github.com/IntelLabs/kafl.linux/commit/1e5206fbd6a3050c4b812a826de29982be7a5905
+
+c. **Exit and reporting hooks**: We added tdx\_fuzz\_event() calls to
+   common error handlers such as panic() and kasan\_report(), but also
+   halt\_loop() macros etc. Moreover, the printk subsystem has been
+   modified to log buffers directly via hypercalls. This allows report
+   error conditions to be returned to the fuzzer and to collect any
+   diagnostics before immediately restoring the initial snapshot for
+   next execution.
+
+Harnesses Definition
+--------------------
+
+Our kAFL agent implements a number of harnesses covering key phases of boot:
+
+-  Early boot process: EARLYBOOT, POST\_TRAP, and START\_KERNEL
+
+-  Subsystem initialization: REST\_INIT, DO\_BASIC, DOINITCALLS,
+   DOINITCALLS\_PCI, DOINITCALLS\_VIRTIO, DOINITCALLS\_ACPI, and
+   DOINITCALLS\_LEVEL\_X
+
+-  Full boot (ends just before dropping to userspace): FULL\_BOOT
+
+-  Kretprobe-based single function harnesses: VIRTIO\_CONSOLE\_INIT and
+   EARLY\_PCI\_SERIAL\_INIT
+
+The full list of boot harnesses with descriptions is available at
+https://github.com/intel/ccc-linux-guest-hardening/blob/master/docs/boot_harnesses.txt
+
+These harnesses are enabled in the guest Linux kernel by setting up the
+kernel build configuration parameters in such a way that the desired
+harness is enabled. For example, set
+CONFIG\_TDX\_FUZZ\_HARNESS\_EARLYBOOT=y to enable the EARLYBOOT harness.
+When enabled, the kernel will execute a tdx\_fuzz\_enable() call at the
+beginning of the harness and a corresponding end call at the end of the
+harness. These calls cause kAFL to take a snapshot at the first fuzzing
+input consumed in the harness, and to reset the snapshot once the
+execution reaches the end of the harness. The fuzzer will continue
+resetting the snapshot in a loop -- having it consume different fuzzing
+input on each reset -- until the fuzzing campaign is terminated.
+
+During the campaign, the fuzzer automatically logs error cases, such as
+crashes, sanitizer violations, or timeouts. Detailed (binary edge)
+traces and kernel logs can be extracted in post-processing runs
+(coverage gathering). To understand the effectiveness of a campaign, we
+map achieved code coverage to relevant input code paths identified by
+:ref:`hardening-smatch-report` ("smatch matching").
+
+
+Example Workflow
+--------------------
+
+Running a boot time fuzzing campaign using our kAFL-based setup
+typically consists of three stages, namely:
+
+#. **Run fuzzing campaign(s).** Here we run the fuzzing campaign itself.
+   The duration of the campaign typically depends on which harness is
+   being used, how much parallelism can be used, etc. We have included a
+   script (fuzz.sh) that sets up a campaign with some default settings.
+   Make sure the guest kernel with the kAFL agent is checked out in
+   ~/tdx/linux-guest. Select a harness that you want to use for fuzzing
+   (in the next examples we will use the DOINITCALLS\_LEVEL\_4 harness).
+   Using our fuzz.sh script, you can run a campaign in the following
+   manner:
+
+   .. code-block:: bash
+
+      ./fuzz.sh full ./linux-guest/
+
+   This starts a single fuzzing campaign, with the settings specified
+   in fuzz.sh. You can get a more detailed view of the status of the
+   campaign using the kafl\_gui.py tool:
+
+   .. code-block:: bash
+
+      kafl_gui.py /dev/shm/$USER_tdfl
+
+#. **Gather the line coverage.** Once the campaign has run for long
+   enough, we can extract the code line coverage from the campaign’s
+   produced fuzzing corpus.
+
+   .. code-block:: bash
+
+      ./fuzz.sh cov /dev/shm/$USER\_tdfl
+
+   This produces output files in the /dev/shm/$USER\_tdfl/traces
+   directory, containing information, such as the line coverage (for
+   example, see the file traces/addr2line.lst).
+
+#. **Match coverage against smatch report.** Finally, to get an idea of
+   what the campaign has covered, we provide some functionality to
+   analyze the obtained line coverage against the smatch report. Using
+   the following command, you can generate a file
+   (traces/smatch\_match.lst) containing the lines from the smatch
+   report that the current fuzzing campaign has managed to reach. Run
+   the smatch analysis using:
+
+   .. code-block:: bash
+
+      ./fuzz.sh smatch /dev/shm/$USER_tdfl
+
+   For a more complete mapping of the PT trace to line coverage, we
+   have included functionality to augment the line coverage with
+   information obtained using Ghidra. For example, if you want to make
+   sure that code lines in in-lined functions are also considered, run
+   the previous command, but set the environmental variable
+   USE\_GHIDRA=1. E.g.:
+
+   .. code-block:: bash
+
+      USE_GHIDRA=1 ./fuzz.sh smatch /dev/shm/$USER_tdfl
+
+We have included a script (`run\_experiments.py <https://github.com/intel/ccc-linux-guest-hardening/blob/master/bkc/kafl/run_experiments.py>`_) that automatically runs
+these three steps for all the different relevant boot time harnesses.
+
+
+Setup Instructions
+-------------------
+
+The full setup instructions for our kAFL-based fuzzing setup can be found at
+https://github.com/intel/ccc-linux-guest-hardening
+
+
+Fuzzing Kernel Runtime
+======================
+
+Fuzzing the TD Guest Kernel at runtime is relevant for any code paths that are
+not exercised during boot or exercised during runtime with different context.
+Finding a way to reliably activate these code paths can be more difficult as an
+appropriate `stimulus` must be found. We present multiple options for finding
+a stimulus program and then fuzzing untrusted host/VMM inputs in context of that
+stimulus.
 
 Fuzzing Stimulus
 ----------------
 
-The biggest challenge with the TD guest runtime fuzzing is to create an
+One challenge with TD guest kernel fuzzing is to create an
 appropriate stimulus for the fuzzing process, i.e. to find a way to
-repeatedly invoke the desired code paths in the TD guest kernel that
+reliably invoke the desired code paths in the TD guest kernel that
 handle an input from the host/VMM. Without such stimulus, it is hard to
 create good fuzzing coverage even for the code locations reported by the
-smatch static analyzer pattern described in section 3.2.2. When it comes
-to the possible stimulus options, the following has been considered:
+smatch static analyzer. We considered the following options:
 
 -  **Write a set of dedicated tests that exercises the desired code
    paths**. The obvious downside of this approach is that it is very
@@ -617,8 +750,8 @@ to the possible stimulus options, the following has been considered:
    works well for the cases when a certain type of operation is known to
    eventually trigger an input from the host/VMM. Examples include Linux
    Test Project (LTP), as well as networking and filesystem test suites
-   (netperf, stress-ng). The challenge here is to identify test programs
-   that trigger all the desired code paths. Todo: put a coverage info +
+   (netperf, stress-ng, perf-fuzzer). The challenge here is to identify test programs
+   that trigger all the desired code paths. **Todo:** put a coverage info +
    refer to section for usermode tracing/fuzzing for how to find/test
    own stimulus.
 
@@ -638,8 +771,29 @@ to the possible stimulus options, the following has been considered:
    the input from the host/VMM. This remains a direction for future
    research.
 
-KF/x fuzzer for virtIO DMA shared memory
-----------------------------------------
+Simple Fuzzer Hooks
+--------------------
+
+This simple fuzzer defines the basic fuzzer structure and the fuzzing
+injection input hooks that can be used by more advanced fuzzers (and in
+our case, used by the kAFL fuzzer) to supply the fuzzing input to the TD
+guest kernel. The fuzzing input is consumed using the tdx\_fuzz() function
+that is called right after the input has been consumed from the host
+using the **TDG.VP.VMCALL** CPU interface.
+
+The fuzzing input that is used by the basic fuzzer is a simple mutation
+using random values and shifts of the actual supplied input from the
+host/VMM. The algorithm to produce the fuzzing input can be found in
+\_\_tdx\_fuzz() from arch/x86/kernel/tdx-fuzz.c. The main limitation of
+this fuzzing approach is an absence of any feedback during the fuzzing
+process, as well as an inability to recover from kernel crashes or
+hangs.
+
+The simple fuzzer exposes several statistics and input injection options via
+debugfs. **TODO** Refer documentation as part of Linux kernel sources.
+
+KF/x DMA Fuzzing
+-----------------
 
 Overview
 ~~~~~~~~
@@ -666,7 +820,7 @@ To fuzz the code that interacts with DMA memory, do the following:
    :width: 5.86458in
    :height: 3.29883in
 
-   Figure 4. KF/x overview
+   Figure 5. KF/x overview
 
 Details
 ~~~~~~~
@@ -719,291 +873,24 @@ Setup instructions
 Wiki
 (github.com) <https://github.com/intel/kernel-fuzzer-for-xen-project/wiki/Virtio-snapshotting-with-KVM-VMI>`__
 
-Simple blind fuzzer for TDG.VP.VMCALL-based interfaces
-------------------------------------------------------
 
-This simple fuzzer defines the basic fuzzer structure and the fuzzing
-injection input hooks that can be used by more advanced fuzzers (and in
-our case, used by the kAFL fuzzer) to supply the fuzzing input to the TD
-guest kernel. The fuzzing input is consumed using the tdx\_fuzz function
-that is called right after the input has been consumed from the host
-using the **TDG.VP.VMCALL** CPU interface.
-
-The fuzzing input that is used by the basic fuzzer is a simple mutation
-using random values and shifts of the actual supplied input from the
-host/VMM. The algorithm to produce the fuzzing input can be found in
-\_\_tdx\_fuzz from arch/x86/kernel/tdx-fuzz.c. The main limitation of
-this fuzzing approach is an absence of any feedback during the fuzzing
-process, as well as an inability to recover from kernel crashes or
-hangs.
-
-kAFL fuzzer for TDG.VP.VMCALL-based interfaces and virtIO DMA shared memory
----------------------------------------------------------------------------
-
-Initially, we adopted `kAFL Fuzzer <https://github.com/IntelLabs/kAFL>`__ for
-effective runtime feedback fuzzing of the **TDG.VP.VMCALL**-based
-interfaces; later on, we extended it to cover some of the virtIO shared
-memory DMA-based interfaces. However, the coverage of DMA-based
-interfaces is only limited to the usage of virtio
-virtio16/32/64\_to\_cpu wrappers described in section 3.2 due to the
-usage of fuzz injection input hooks that have been added to these
-wrappers.
-
-Overview
-~~~~~~~~
+kAFL Stimulus Fuzzing
+---------------------
 
 .. figure:: images/kAFL-runtime-overview.png
    :width: 3.60417in
    :height: 3.98958in
 
-   Figure 5. kAFL runtime fuzzing overview. 1) start of fuzzing 2)
+   Figure 6. kAFL runtime fuzzing overview. 1) start of fuzzing 2)
    input fuzz buffer from host 3) stimulus is consumed from userspace
    4) MSR/PIO/MMIO causes a #VE 5) the agent injects a value obtained
    from 6) the input buffer 7) finally, reporting back the status to
    the host (crash/ hang/ ok)
 
-While kAFL can work based on binary rewrite and traps, the more
-flexible approach is to modify the target’s source code. This
-implements an agent that directly hooks relevant subsystems and
-low-level input functions and feeds fuzzing input. At a high level,
-our agent implementation consists of three parts:
 
-a. **Core agent logic**: This includes fuzzer initialization and helper
-   functions for logging and debug. The fuzzer is initialized with
-   tdg\_fuzz\_enable(), and accepts control input via tdg\_fuzz\_event()
-   to start/stop/pause input injection or report an error event.
-   https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-3/arch/x86/kernel/kafl-agent.c
-
-b. **Input hooks**: We currently leverage the tdx\_fuzz guest kernel
-   hooks the same as ‘simple fuzzer’ described in section 3.3.3. If
-   enabled, the agent’s implementation of tdx\_fuzz()sequentially
-   consumes inputs from an internally maintained payload buffer. Fuzzing
-   stops when the buffer is fully consumed or other exit conditions are
-   met.
-   https://github.com/IntelLabs/kafl.linux/commit/1e5206fbd6a3050c4b812a826de29982be7a5905
-
-c. **Exit and reporting hooks**: We added tdx\_fuzz\_event() calls to
-   common error handlers such as panic() and kasan\_report(), but also
-   halt\_loop() macros etc. Moreover, the printk subsystem has been
-   modified to log buffers directly via hypercalls. This allows report
-   error conditions to be returned to the fuzzer and to collect any
-   diagnostics before immediately restoring the initial snapshot for
-   next execution.
-
-As with the other runtime fuzzing setups, the kAFL setup requires an
-adequate “stimulus” to trigger kernel code paths that consume data from
-the untrusted host/VMM (either using **TDG.VP.VMCALL**-based interface
-or virtIO DMA shared memory). We setup kAFL to run any desired userspace
-binaries as stimulus input, using a flexible bash script to initialize
-snapshotting + stimulus execution from /sbin/binit.
-
-Setup instructions
-~~~~~~~~~~~~~~~~~~
-
-The full setup instructions for our kAFL-based fuzzing setup can be found at
-https://github.com/intel/ccc-linux-guest-hardening
-
-3.9) TD guest kernel boot time fuzzing
-======================================
-
-A successful boot-time fuzzing requires many repetitions of the boot
-process. These repetitions act as a stimulus to trigger the kernel boot
-code paths where a TD guest kernel obtains the input from the host/VMM.
-The invocation of these code paths is usually hard to achieve in runtime
-after the kernel has already booted due to absence of re-initialization
-paths for many of these kernel subsystems. Moreover, injecting invalid
-inputs at boot time will often lead to unrecoverable but benign error
-situations, causing significant delays with typical testing approaches.
-
-As described in section 3.3.4, we have adopted the `kAFL Fuzzer
-<https://github.com/IntelLabs/kAFL>`__ for effective feedback fuzzing of the Linux
-bootstrapping phase. Using a combination of fast VM snapshots and kernel
-hooks, kAFL allows flexible harnessing of the relevant kernel
-sub-systems and automated reporting and recovery from typical error
-conditions such as panic() or KASAN handlers.
-
-Overview
---------
-
-.. figure:: images/kAFL-overview.png
-   :width: 3.48364in
-   :height: 3.73366in
-
-   Figure 6. kAFL overview. 1) start of fuzzing (entry to kernel) 2)
-   fuzzing harness 3) input fuzz buffer from host 4) MSR/PIO/MMIO causes a
-   #VE 5) the agent injects a value obtained from 6) the input buffer 7)
-   finally, reporting back the status to the host (crash/ hang/ ok)
-
-Similar to the kAFL runtime setup, the boot-time kAFL fuzzer uses the
-tdx\_fuzz() hook to inject fuzzing input for the bulk of low-level
-accessor functions. Additional hooks may be required to cover MMIO using
-custom access functions (e.g., VirtIO) as well as DMA. These are not
-currently fully covered by the current kAFL agent (see limitations
-described in section 3.3.4).
-
-Details
--------
-
-Our kAFL agent implements a number of harnesses covering key phases of boot:
-
--  Early boot process: EARLYBOOT, POST\_TRAP, and START\_KERNEL
-
--  Subsystem initialization: REST\_INIT, DO\_BASIC, DOINITCALLS,
-   DOINITCALLS\_PCI, DOINITCALLS\_VIRTIO, DOINITCALLS\_ACPI, and
-   DOINITCALLS\_LEVEL\_X
-
--  Full boot (ends just before dropping to userspace): FULL\_BOOT
-
--  Kretprobe-based single function harnesses: VIRTIO\_CONSOLE\_INIT and
-   EARLY\_PCI\_SERIAL\_INIT
-
-The full list of boot harnesses with descriptions is available at
-https://github.com/intel/ccc-linux-guest-hardening/blob/master/docs/boot_harnesses.txt
-
-These harnesses are enabled in the guest Linux kernel by setting up the
-kernel build configuration parameters in such a way that the desired
-harness is enabled. For example, set
-CONFIG\_TDX\_FUZZ\_HARNESS\_EARLYBOOT=y to enable the EARLYBOOT harness.
-When enabled, the kernel will execute a tdx\_fuzz\_enable() call at the
-beginning of the harness and a corresponding end call at the end of the
-harness. These calls cause kAFL to take a snapshot at the first fuzzing
-input consumed in the harness, and to reset the snapshot once the
-execution reaches the end of the harness. The fuzzer will continue
-resetting the snapshot in a loop -- having it consume different fuzzing
-input on each reset -- until the fuzzing campaign is terminated.
-
-During the campaign, the fuzzer automatically logs error cases, such as
-crashes, sanitizer violations, or timeouts. Detailed (binary edge)
-traces and kernel logs can be extracted in post-processing runs
-(coverage gathering). To understand the effectiveness of a campaign, we
-map achieved code coverage to relevant guest input cases identified in
-the smatch report (see 3.3) (smatch matching).
-
-For further usage info check tool-specific documentation/guidance at
-https://github.com/intel/ccc-linux-guest-hardening/
-
-How to run/ workflow
---------------------
-
-Running a boot time fuzzing campaign using our kAFL-based setup
-typically consists of three stages, namely:
-
-#. **Run fuzzing campaign(s).** Here we run the fuzzing campaign itself.
-   The duration of the campaign typically depends on which harness is
-   being used, how much parallelism can be used, etc. We have included a
-   script (fuzz.sh) that sets up a campaign with some default settings.
-   Make sure the guest kernel with the kAFL agent is checked out in
-   ~/tdx/linux-guest. Select a harness that you want to use for fuzzing
-   (in the next examples we will use the DOINITCALLS\_LEVEL\_4 harness).
-   Using our fuzz.sh script, you can run a campaign in the following
-   manner:
-
-   .. code-block:: bash
-
-      ./fuzz.sh full linux-guest
-
-   This starts a single fuzzing campaign, with the settings specified
-   in fuzz.sh. You can get a more detailed view of the status of the
-   campaign using the kafl\_gui.py tool:
-
-   .. code-block:: bash
-
-      python3 kafl/kafl_gui.py /dev/shm/$USER_tdfl
-
-#. **Gather the line coverage.** Once the campaign has run for long
-   enough, we can extract the code line coverage from the campaign’s
-   produced fuzzing corpus.
-
-   .. code-block:: bash
-
-      ./fuzz.sh cov /dev/shm/$USER\_tdfl
-
-   This produces output files in the /dev/shm/$USER\_tdfl/traces
-   directory, containing information, such as the line coverage (for
-   example, see the file traces/addr2line.lst).
-
-#. **Match coverage against smatch report.** Finally, to get an idea of
-   what the campaign has covered, we provide some functionality to
-   analyze the obtained line coverage against the smatch report. Using
-   the following command, you can generate a file
-   (traces/smatch\_match.lst) containing the lines from the smatch
-   report that the current fuzzing campaign has managed to reach. Run
-   the smatch analysis using:
-
-   .. code-block:: bash
-
-      ./fuzz.sh smatch /dev/shm/$USER_tdfl
-
-   For a more complete mapping of the PT trace to line coverage, we
-   have included functionality to augment the line coverage with
-   information obtained using Ghidra. For example, if you want to make
-   sure that code lines in in-lined functions are also considered, run
-   the previous command, but set the environmental variable
-   USE\_GHIDRA=1. E.g.:
-
-   .. code-block:: bash
-
-      USE_GHIDRA=1 ./fuzz.sh smatch /dev/shm/$USER_tdfl
-
-We have included a script (`run\_experiments.py <https://github.com/intel/ccc-linux-guest-hardening/blob/master/bkc/kafl/run_experiments.py>`_) that automatically runs
-these three steps for all the different relevant boot time harnesses.
-
-Fuzzer options
---------------
-
-Logging crashes
-~~~~~~~~~~~~~~~
-
-Some crashes found in the kernel might not be easily/deterministically
-reproducible just based on the fuzzing input. We have included a flag
-`-–log\_crashes`, which always logs the kernel log in case a crash is
-detected. To run a campaign with this enabled:
-
-.. code-block:: bash
-
-   ./fuzz.sh full linux-guest --log_crashes
-
-This creates a folder called ‘logs/’ containing such log files in your
-fuzzer workdir (/dev/shm/$USER\_tdfl).
-
-Full logs
-~~~~~~~~~
-
-Sometimes you might want the full logs for the whole campaign. In such
-cases, use the `-–log\_hprintf` flag. This creates log files called
-hprintf\_XX.log (where XX is the worker id) in your fuzzer workdir.
-
-Single function harnesses
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can enable a single function harness by setting the
-‘fuzzer\_func\_harness=my\_function’ kernel boot parameter in our guest
-kernel. For example, to fuzz the function acpi\_init, setup your guest
-kernel to use the NONE harness by building the kernel with the following
-build config: CONFIG\_TDX\_FUZZ\_HARNESS\_NONE=y. After building the
-kernel you start up the fuzzing campaign with a single function target:
-
-.. code-block:: bash
-
-   KERNEL_BOOT_PARAMS=”fuzzer_func_harness=acpi_init” \\
-   ./fuzz.sh full ~/tdx/linux-guest
-
-Extra fuzzing hooks
-~~~~~~~~~~~~~~~~~~~
-
-Some points where we want to inject fuzzer input do not cause a #VE
-(e.g., VirtIO DMA memory). We can optionally enable fuzzing of VirtIO
-DMA reads by setting the kernel config parameter
-“CONFIG\_TDX\_FUZZ\_KAFL\_VIRTIO”. This enables the fuzzing hooks for
-virtioXX\_to\_cpu(), allowing the fuzzer to inject input whenever these
-wrappers are called.
-
-3.10) Runtime / Stimulus Fuzzing with kAFL
-==========================================
-
-The kAFL agent described in 3.9 can also be
-used to trace and fuzz custom stimulus programs from userspace. The kAFL
-setp for userspace fuzzing uses to following additional components:
+The kAFL agent described earlier can also be used to trace and fuzz custom
+stimulus programs from userspace. The kAFL setp for userspace fuzzing uses to
+following additional components:
 
 -  kAFL agent exposes a userspace interface via debugfs. The interface
    offers similar controls to those used to implement boot-time harneses
@@ -1016,14 +903,21 @@ setp for userspace fuzzing uses to following additional components:
    via debugfs.
 
 -  To avoid managing a large range of filesystems, kAFL offers a
-   ‘-sharedir’ option that allows to download files into the guest at
+   ‘sharedir’ option that allows to download files into the guest at
    runtime. This way, the rootfs only contains a basic loader while
    actual execution is driven by scripts and programs on the Host.
    Communication is done using hypercalls and works independently of
    virtio or other guest drivers.
 
-3.10.1) Basic operation
------------------------
+Harness Setup
+~~~~~~~~~~~~~
+
+As with the other runtime fuzzing setups, the kAFL setup requires an
+adequate “stimulus” to trigger kernel code paths that consume data from
+the untrusted host/VMM (either using **TDG.VP.VMCALL**-based interface
+or virtIO DMA shared memory). We setup kAFL to run any desired userspace
+binaries as stimulus input, using a flexible bash script to initialize
+snapshotting & stimulus execution from /sbin/init.
 
 The usermode harness that is downloaded and launched by the loader can
 be any script or binary and may also act as an intermediate loader or
@@ -1035,14 +929,22 @@ loop has started, execution is traced for coverage feedback and the
 userspace is fully reset after timeout, crashes, or when the “done”
 event is signaled via debugfs.
 
-3.11) Basic operation
-=====================
+Example harness using a stimulus.elf program:
 
-.. figure:: images/example-harness.png
-   :width: 5.00000in
-   :height: 3.48958in
+   .. code-block:: bash
 
-   Example harness (downloaded and launched from initrd/launcher):
+      #!/bin/bash
+      KAFL_CTL=/sys/kernel/debug/kafl
+      hget stimulus.elf # fetch test binary from host
+      echo "[*] kAFL agent status:"
+      grep . $KAFL_CTL/*
+      # "start" signal initializes agent and triggers snapshot
+      echo "start" > $KAFL_CTL/control
+      # execute the stimulus, redirecting outputs to host hprintf log
+      ./stimulus.elf 2>&1 |hcat
+      # if we have not crashed, signal "success" and restore snapshot
+      echo "done" > $KAFL_CTL/control
+
 
 Detailed setup and scripts to generate small rootfs/initrd:
 https://github.com/intel/ccc-linux-guest-hardening/tree/master/bkc/kafl/userspace

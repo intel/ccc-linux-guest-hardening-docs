@@ -11,8 +11,8 @@ Sebastian Osterlund
 Steffen Schulz
 
 
-1) Purpose of the document and targeted audience
-************************************************
+Purpose and Scope
+=================
 
 The main security goal of Intel® Trust Domain Extension (Intel® TDX)
 technology is to remove the need for a guest VM to trust the host and
@@ -42,8 +42,8 @@ The overall threat model and security architecture for the TD guest
 kernel is described in the :ref:`security-spec` and it is
 recommended to be read together with this document.
 
-2) Hardening strategy overview
-******************************
+Hardening strategy overview
+===========================
 
 The overall hardening strategy shown in Figure 1 encompasses three
 activities that are executed in parallel: attack surface minimization,
@@ -100,11 +100,8 @@ operation of the guest kernel within the Linux TD software stack and the
 absence of issues identified or reported during its deployment lifecycle
 is a much stronger, albeit a post factum indicator.
 
-3) Detailed hardening strategy
-******************************
-
-3.1) Attack surface minimization
-================================
+Attack surface minimization
+===========================
 
 The main objective for this task is to disable as much code as possible
 from the TD guest kernel to limit the number of interfaces exposed to
@@ -147,8 +144,8 @@ deployment scenario.
        registration interface at all and therefore would be allowed by the above
        driver filter. In any case port IO filter makes sure that only a limited
        number of ports are allowed to be communicating with host/VMM. The port IO
-       allow list can be found in section 2.5) IO ports of
-       :ref:`security-spec` . Note that in the decompressed mode, the port IO
+       allow list can be found in :ref:`sec-io-ports`.
+       Note that in the decompressed mode, the port IO
        filter is not active and therefore it is only applicable for early port IO
        and normal port IO.
    * - ACPI table allow list
@@ -165,15 +162,15 @@ deployment scenario.
        XSDT, FACP, DSDT, FACS, APIC, and SVKL. Note that a presence of a minimal
        ACPI table configuration does not by itself guarantee the overall security
        hardening of ACPI subsystem in the TD guest kernel. The known limitations
-       on ACPI hardening are described in section 7 of :ref:`security-spec`.
+       on ACPI hardening are described in :ref:`sec-acpi-tables`.
    * - KVM CPUID allow list and KVM hypercalls
      - KVM supports a set of hypercalls that a TD guest kernel can request a VMM to
        perform. On x86, this set is defined by a set of exposed CPUID bits. Some
        of the hypercalls can result in untrusted data being passed from a VMM
        KVM) to the guest kernel. To limit this attack vector, the implemented KVM
        CPUID allow list restricts the available KVM CPUID bits to a small
-       predefined allow list. More information can be found in sections 3.6 and
-       3.7 of :ref:`security-spec`.
+       predefined allow list. More information can be found in
+       :ref:`sec-kvm-hypercalls` and :ref:`sec-kvm-cpuid`.
 
 Explicitly disabled functionality
 ---------------------------------
@@ -219,11 +216,13 @@ space accesses: only authorized devices are allowed to perform PCI
 config space reads (this applies even to the PCI config space done from
 the device initialization routine).
 
-3.2) Static code analyzer driven manual code audit
-==================================================
+.. _hardening-smatch-report:
 
-3.3) Requirements and goals
-===========================
+Static Analyzer and Code Audit
+==============================
+
+Requirements and goals
+----------------------
 
 The attack surface minimization activity outlined in the previous
 section helps to limit the amount of TD guest kernel code that actively
@@ -255,8 +254,8 @@ this process:
    accessible for open source and for the kernel community to use and
    should be actively maintained and supported.
 
-3.4) Check\_host\_input smatch pattern
-======================================
+Check\_host\_input smatch pattern
+---------------------------------
 
 Based on the above requirements, a smatch static code analyzer
 (http://smatch.sourceforge.net/) has
@@ -297,47 +296,6 @@ access memory locations residing in virtIO ring DMA pages. The
 invocation of these wrappers can be detected by the check\_host\_input
 smatch pattern and the findings can be reported similarly as for other
 non-DMA accesses.
-
-.. I left the following block in place because it has escaped underscores,
-.. which is the correct procedure for ReST. However, when using the code-block
-.. directive, backslashes are displayed instead of being interpreted.
-.. Since it is tedious to replace backslashes to escape the underscores and
-.. I was uncertain if the team wants to display this example output in a
-.. code-block, I retained the escaped version of the content and commented out
-.. the entire block. Remove this block if the second code block below is
-.. acceptable.
-
-   arch/x86/pci/irq.c:1201 pirq\_enable\_irq() warn:
-   {9123410094849481700}read from the host using function
-   'pci\_read\_config\_byte' to an int type local variable 'pin', type is
-   uchar;
-
-   arch/x86/pci/irq.c:1216 pirq\_enable\_irq() error:
-   {11769853683657473858}Propagating an expression containing a tainted
-   value from the host 'pin - 1' into a function
-   'IO\_APIC\_get\_PCI\_irq\_vector';
-
-   arch/x86/pci/irq.c:1228 pirq\_enable\_irq() error:
-   {15187152360757797804}Propagating a tainted value from the host 'pin'
-   into a function 'pci\_swizzle\_interrupt\_pin';
-
-   arch/x86/pci/irq.c:1229 pirq\_enable\_irq() error:
-   {8593519367775469163}Propagating an expression containing a tainted
-   value from the host 'pin - 1' into a function
-   'IO\_APIC\_get\_PCI\_irq\_vector';
-
-   arch/x86/pci/irq.c:1233 pirq\_enable\_irq() warn:
-   {3245640912980979571}Propagating an expression containing a tainted
-   value from the host '65 + pin - 1' into a function '\_dev\_warn';
-
-   arch/x86/pci/irq.c:1243 pirq\_enable\_irq() warn:
-   {11844818720957432302}Propagating an expression containing a tainted
-   value from the host '65 + pin - 1' into a function '\_dev\_info';
-
-   arch/x86/pci/irq.c:1262 pirq\_enable\_irq() warn:
-   {14811741117821484023}Propagating an expression containing a tainted
-   value from the host '65 + pin - 1' into a function '\_dev\_warn';
-
 
 .. code-block:: shell
 
@@ -408,8 +366,10 @@ sure every single code path is secure.
 
 Figure 3. Code snippet for the pirq\_enable\_irq function.
 
-3.5) Performing a manual code audit
-===================================
+.. _hardening-performing-manual-audit:
+
+Performing a manual code audit
+------------------------------
 
 When a manual code audit activity is performed, the list of smatch
 findings is first filtered using the process\_smatch\_output.py python
@@ -471,8 +431,8 @@ list of “concern” items can be classified into two categories:
    affecting KASLR randomization.
 
 
-3.6) Applying code audit results to different kernel trees
-==========================================================
+Applying code audit results to different kernel trees
+-----------------------------------------------------
 
 The provided list at https://github.com/intel/ccc-linux-guest-hardening/tree/master/audit/sample_output/5.15-rc1
 of smatch findings for the version 5.15-rc1 kernel
@@ -536,8 +496,9 @@ automatically transfer due to one of the following reasons:
    finding (i.e., “safe”, “concern”, etc.)
 
 The reported code locations in the \*\_results\_new file must be
-manually audited following the logic described in section 3.2.3. The
-\*\_results\_analyzed file is a combination of the \*\_results\_new and
+manually audited following the logic described in
+:ref:`hardening-performing-manual-audit`.
+The \*\_results\_analyzed file is a combination of the \*\_results\_new and
 the \*\_results\_old file with all the entries arranged in the order of
 static analysis scan.
 
@@ -554,14 +515,13 @@ therefore improve the accuracy of automatic result transfer) to include
 the code around the expression in a way that it is done in various
 version control systems, but it has not been done yet.
 
-3.7) Fuzzing
-============
+TD Guest Fuzzing
+================
 
 Fuzzing is a well-established software validation technique that can be
 used to find problems in input handling of various software components.
 In our TD guest kernel hardening project, we used it to validate and
-cross check the results from the manual code audit activity described in
-section 3.2.
+cross check the results from the manual code audit activity.
 
 The main goals for the fuzzing activity are:
 
@@ -774,10 +734,11 @@ a. **Core agent logic**: This includes fuzzer initialization and helper
    to start/stop/pause input injection or report an error event.
    https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-3/arch/x86/kernel/kafl-agent.c
 
-b. **Input hooks**: We currently leverage the tdx\_fuzz guest kernel
-   hooks the same as ‘simple fuzzer’ described in section 3.3.3. If
-   enabled, the agent’s implementation of tdx\_fuzz()sequentially
-   consumes inputs from an internally maintained payload buffer. Fuzzing
+b. **Input hooks**: We leverage the tdx\_fuzz hooks of in the
+   guest kernel as defined by `Simple Fuzzer Hooks`_ as well as
+   virtio16/32/64\_to\_cpu wrappers for VirtIO DMA input.
+   When enabled, the fuzzing hooks are implemented to sequentially
+   consume input from a payload buffer maintained by the agent. Fuzzing
    stops when the buffer is fully consumed or other exit conditions are
    met.
    https://github.com/IntelLabs/kafl.linux/commit/1e5206fbd6a3050c4b812a826de29982be7a5905
@@ -876,13 +837,13 @@ During the campaign, the fuzzer automatically logs error cases, such as
 crashes, sanitizer violations, or timeouts. Detailed (binary edge)
 traces and kernel logs can be extracted in post-processing runs
 (coverage gathering). To understand the effectiveness of a campaign, we
-map achieved code coverage to relevant guest input cases identified in
-the smatch report (see 3.3) (smatch matching).
+map achieved code coverage to relevant input code paths identified by
+:ref:`hardening-smatch-report` ("smatch matching").
 
 For further usage info check tool-specific documentation/guidance at
 https://github.com/intel/ccc-linux-guest-hardening/
 
-How to run/ workflow
+Example Workflow
 --------------------
 
 Running a boot time fuzzing campaign using our kAFL-based setup

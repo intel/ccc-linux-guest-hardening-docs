@@ -5,10 +5,7 @@ Intel® Trust Domain Extension Guest Linux\* Kernel Hardening Strategy
 
 Contributors:
 
-Elena Reshetova
-Tamas Lengyel
-Sebastian Osterlund
-Steffen Schulz
+Elena Reshetova, Tamas Lengyel, Sebastian Osterlund, Steffen Schulz
 
 
 Purpose and Scope
@@ -408,6 +405,11 @@ statuses:
        function is being checked for processing the host input in a secure way,
        but additionally all its callers are also reported by the smatch pattern
        and the code audit happens on each caller.
+   * - trusted
+     - The consumed input comes from a trusted source for Intel TDX guest, i.e.
+       it is provided by the TDX module or context-switched for every TDX guest
+       (i.e. native). This is applicable for both MSRs and CPUIDs. More information
+       can be found in :ref:`sec-msrs` and :ref:`sec-sec-cpuids`.
    * - safe
      - The consumed host input looks to be used in a secure way
    * - concern
@@ -759,7 +761,7 @@ smatch static analyzer. We considered the following options:
    using existing test suites or creating new ones can be a method that
    would programmatically exercise the existing TD guest kernel runtime
    code paths and produce a set of programs that allow invocation of the
-   paths that lead to obtaining an unput from the host/VMM. Fortunately,
+   paths that lead to obtaining an input from the host/VMM. Fortunately,
    the Linux kernel has a well-known tool for exercising the kernel in
    runtime – syzkaller fuzzer. While being a fuzzing tool that was
    originally created to test the robustness of ring3 to ring0

@@ -5,8 +5,7 @@ Intel® Trust Domain Extension Linux\* Guest Kernel Security Specification
 
 Contributors:
 
-Andi Kleen
-Elena Reshetova
+Andi Kleen, Elena Reshetova
 
 Purpose and Scope
 =================
@@ -238,6 +237,8 @@ through MMIO or CF8 port IO, which would circumvent the allow list.
 Subsequent sections explain how to filter those in the #VE handler
 (see `MSRs`_ and `IO Ports`_ )
 
+.. _sec-msrs:
+
 MSRs
 ----
 
@@ -406,11 +407,13 @@ Safe CPUIDs
  - KVM\_FEATURE\_NOP\_IO\_DELAY: Only affects nops.
  - KVM\_FEATURE\_PV\_SEND\_IPI: Equivalent to APIC write.
  - KVM\_HINTS\_REALTIME: Changes spinlock behavior, but just a hint.
+ 
+ .. _sec-cpuids:
 
 CPUID
 -----
 
-In theory, CPUID could be used to let the guest kernel execute
+Reading untrusted CPUIDs could be used to let the guest kernel execute
 non-hardened code paths. The TDX module ensures that most CPUID values
 are trusted (see 18.2 in https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf), but some are configurable
 via the TD\_PARAMS structure or can be provided by the untrusted

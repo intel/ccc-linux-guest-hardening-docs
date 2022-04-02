@@ -16,7 +16,7 @@ technology is to remove the need for a guest VM to trust the host and
 Virtual Machine Manager (VMM). However, it cannot by itself protect the
 guest VM from host/VMM attacks that leverage existing paravirt-based
 communication interfaces between the host/VMM and the guest, such as
-MMIO, portIO, etc. To achieve protection against such attacks, the guest
+MMIO, Port IO, etc. To achieve protection against such attacks, the guest
 VM software stack needs to be hardened to securely handle an untrusted
 and potentially malicious input from a host/VMM via the above-mentioned
 interfaces. This hardening effort should be applied to a concrete set of
@@ -94,8 +94,8 @@ but it neither guarantees that the end goal of having a secure guest
 kernel has been successfully reached nor does it necessarily indicate
 that the chosen hardening approach is successful. The successful
 operation of the guest kernel within the Linux TD software stack and the
-absence of issues identified or reported during its deployment lifecycle
-is a much stronger, albeit a post factum indicator.
+absence of issues identified or reported during its deployment life cycle
+is a much stronger, albeit a post-factum indicator.
 
 Attack surface minimization
 ===========================
@@ -251,10 +251,10 @@ this process:
    accessible for open source and for the kernel community to use and
    should be actively maintained and supported.
 
-Check\_host\_input smatch pattern
+Check\_host\_input Smatch pattern
 ---------------------------------
 
-Based on the above requirements, a smatch static code analyzer
+Based on the above requirements, a Smatch static code analyzer
 (http://smatch.sourceforge.net/) has
 been chosen since it provides an easy interface to write custom patterns
 to search for problematic locations in the kernel source tree. Smatch
@@ -262,7 +262,7 @@ already has a big set of existing patterns that have been used to find
 many security issues with the current mainline kernel.
 
 To identify the locations where a TD guest kernel can take an untrusted
-input from the host/VMM, a custom smatch pattern check\_host\_input has
+input from the host/VMM, a custom Smatch pattern check\_host\_input has
 been written. It operates based on a list of “host input functions”. The list
 contains known, low-level functions that perform MSR, port IO, and MMIO
 reads, such as native\_read\_msr, inb/w/l, readb/w/l, as well as
@@ -274,24 +274,24 @@ pattern when run against the whole kernel tree is a list of findings
 with exact code locations and some additional information to assist the
 manual code audit process.
 
-The current approach using the check\_host\_input smatch pattern has
+The current approach using the check\_host\_input Smatch pattern has
 several limitations. The main limitation is the importance of having a
 correct list of input functions since the pattern will not detect the
 invocations of functions not present in this list. Fortunately, the
 low-level functions for performing MSR, port IO, and MMIO read
 operations are well defined in the Linux kernel. The higher-level
 wrappers can be identified by using an iterative approach: run the
-check\_host\_input smatch pattern to find all invocations of the
+check\_host\_input Smatch pattern to find all invocations of the
 low-level functions. By looking at these invocations, you can determine
 the next level wrappers, add them to the input function list, and re-run
-the smatch pattern again. Another limitation of this approach is the
+the Smatch pattern again. Another limitation of this approach is the
 inability to detect generic DMA-style memory accesses, since they
 typically do not use any specific functions or wrappers to receive the
 data from the host/VMM. An exception here is a virtIO ring subsystem
 that uses virtio16/32/64\_to\_cpu wrappers in most of the places to
 access memory locations residing in virtIO ring DMA pages. The
 invocation of these wrappers can be detected by the check\_host\_input
-smatch pattern and the findings can be reported similarly as for other
+Smatch pattern and the findings can be reported similarly as for other
 non-DMA accesses.
 
 .. code-block:: shell
@@ -327,9 +327,9 @@ non-DMA accesses.
    {14811741117821484023}Propagating an expression containing a tainted
    value from the host '65 + pin - 1' into a function '_dev_warn';
 
-Figure 2. Sample output from the check\_host\_input smatch pattern.
+Figure 2. Sample output from the check\_host\_input Smatch pattern.
 
-The sample output of the check\_host\_input smatch pattern is shown on
+The sample output of the check\_host\_input Smatch pattern is shown on
 Figure 2. The function pirq\_enable\_irq performs a PCI config space
 read operation using a pci\_read\_config\_byte input function (PCI
 config space specific higher-level wrapper) and stores the result in the
@@ -339,7 +339,7 @@ pci\_swizzle\_interrupt\_pin functions, as well as to several
 \_dev\_info/warn functions. The relevant code snippet with highlighted
 markings is shown in Figure 3.
 
-The check\_host\_input smatch pattern attempts to to provide a rough
+The check\_host\_input Smatch pattern attempts to to provide a rough
 indication of severity for each finding via “warn” or “error” keywords
 highlighted in grey in Figure 2. Whenever a host input is being used as
 a condition for iteration, assigned to an external variable, returned by
@@ -368,14 +368,14 @@ Figure 3. Code snippet for the pirq\_enable\_irq function.
 Performing a manual code audit
 ------------------------------
 
-When a manual code audit activity is performed, the list of smatch
+When a manual code audit activity is performed, the list of Smatch
 findings is first filtered using the process\_smatch\_output.py python
 script to discard the results for the areas that are disabled within the
 TD guest kernel. For example, most of the drivers/\* and sound/\*
 results are filtered out except for the drivers that are enabled in the
 TD guest kernel.
 
-Next, the reduced list of smatch pattern findings can be analyzed
+Next, the reduced list of Smatch pattern findings can be analyzed
 manually by looking at each reported code location and verifying that
 the consumed host input is used in a secure way.
 
@@ -392,7 +392,7 @@ statuses:
    * - excluded
      - This code location is not reachable inside a TD guest due to it being
        non-Intel code or functionality that is disabled for the TD guest kernel.
-       The reason these lines are not filtered from the smatch report by the above
+       The reason these lines are not filtered from the Smatch report by the above
        process\_smatch\_output.py python script is additional checks that we do
        when executing the fuzzing activity described in the next section. We
        perform an additional verification that none of these excluded code
@@ -403,7 +403,7 @@ statuses:
    * - wrapper
      - The function that consumed a host input is a higher-level wrapper. The
        function is being checked for processing the host input in a secure way,
-       but additionally all its callers are also reported by the smatch pattern
+       but additionally all its callers are also reported by the Smatch pattern
        and the code audit happens on each caller.
    * - trusted
      - The consumed input comes from a trusted source for Intel TDX guest, i.e.
@@ -437,14 +437,14 @@ Applying code audit results to different kernel trees
 -----------------------------------------------------
 
 The provided list at https://github.com/intel/ccc-linux-guest-hardening/tree/master/audit/sample_output/5.15-rc1
-of smatch findings for the version 5.15-rc1 kernel
+of Smatch findings for the version 5.15-rc1 kernel
 contains results of our manual code audit activity for this kernel
 (Please note that the provided list
 does not have 'safe' or 'concern' markings published) and
 can be used as a baseline for performing a manual audit on other kernel
 versions or on custom vendor kernels. Here is the suggested procedure:
 
-#. Run the provided check\_host\_input smatch pattern on a desired
+#. Run the provided check\_host\_input Smatch pattern on a desired
    target kernel tree:
 
    .. code-block:: bash
@@ -465,8 +465,8 @@ versions or on custom vendor kernels. Here is the suggested procedure:
 
       python3 process_smatch_output.py smatch_warns.txt
 
-   The output file of this step, smatch_warns.txt\_filtered, is a reduced
-   list of check\_host\_input smatch findings for a target kernel tree.
+   The output file of this step, smatch\_warns.txt\_filtered, is a reduced
+   list of check\_host\_input Smatch findings for a target kernel tree.
    This file should have all the relevant findings that should be
    manually audited.
 
@@ -528,13 +528,13 @@ cross check the results from the manual code audit activity.
 The main goals for the fuzzing activity are:
 
 1. Automatically exercise the robustness of the existing TD guest kernel
-   code that was identified by the smatch pattern as handling the input
+   code that was identified by the Smatch pattern as handling the input
    from the host/VMM.
 
 2. Identify new TD guest kernel code locations that handle the input
-   from the host/VMM and were missed by the smatch pattern (for example
+   from the host/VMM and were missed by the Smatch pattern (for example
    some virtIO DMA accesses). When such locations are identified, the
-   smatch pattern can be further improved to catch these and similar
+   Smatch pattern can be further improved to catch these and similar
    places in other parts of the kernel code.
 
 3. Automatically verify that the code that is expected to be disabled in
@@ -554,7 +554,7 @@ during boot as well as during runtime.
 Fuzzing Kernel Boot
 ===================
 
-The majority of input points identified by smatch analysis and manual audit are
+The majority of input points identified by Smatch analysis and manual audit are
 invoked as part of kernel boot.
 The invocation of these code paths is usually hard to achieve at runtime
 after the kernel has already booted due to absence of re-initialization
@@ -564,7 +564,7 @@ We have adopted the `kAFL Fuzzer
 <https://github.com/IntelLabs/kAFL>`__ for effective feedback fuzzing of the Linux
 bootstrapping phase. Using a combination of fast VM snapshots and kernel
 hooks, kAFL allows flexible harnessing of the relevant kernel
-sub-systems, fast recovery from beningn error conditions, and automated
+sub-systems, fast recovery from benign error conditions, and automated
 reporting of any desired errors and exceptions handlers.
 
 .. figure:: images/kAFL-overview.png
@@ -644,7 +644,7 @@ crashes, sanitizer violations, or timeouts. Detailed (binary edge)
 traces and kernel logs can be extracted in post-processing runs
 (coverage gathering). To understand the effectiveness of a campaign, we
 map achieved code coverage to relevant input code paths identified by
-:ref:`hardening-smatch-report` ("smatch matching").
+:ref:`hardening-smatch-report` ("Smatch matching").
 
 
 Example Workflow
@@ -687,13 +687,13 @@ typically consists of three stages, namely:
    directory, containing information, such as the line coverage (for
    example, see the file traces/addr2line.lst).
 
-#. **Match coverage against smatch report.** Finally, to get an idea of
+#. **Match coverage against Smatch report.** Finally, to get an idea of
    what the campaign has covered, we provide some functionality to
-   analyze the obtained line coverage against the smatch report. Using
+   analyze the obtained line coverage against the Smatch report. Using
    the following command, you can generate a file
-   (traces/smatch\_match.lst) containing the lines from the smatch
+   (traces/smatch\_match.lst) containing the lines from the Smatch
    report that the current fuzzing campaign has managed to reach. Run
-   the smatch analysis using:
+   the Smatch analysis using:
 
    .. code-block:: bash
 
@@ -739,11 +739,11 @@ appropriate stimulus for the fuzzing process, i.e. to find a way to
 reliably invoke the desired code paths in the TD guest kernel that
 handle an input from the host/VMM. Without such stimulus, it is hard to
 create good fuzzing coverage even for the code locations reported by the
-smatch static analyzer. We considered the following options:
+Smatch static analyzer. We considered the following options:
 
 -  **Write a set of dedicated tests that exercises the desired code
    paths**. The obvious downside of this approach is that it is very
-   labor-intensive and manual. Also, the smatch static analyzer list of
+   labor-intensive and manual. Also, the Smatch static analyzer list of
    findings goes well beyond 1500 unique entries; this approach does not
    scale since some of the tests might have to be modified manually as
    the mainline Linux kernel keeps developing.
@@ -763,12 +763,12 @@ smatch static analyzer. We considered the following options:
    code paths and produce a set of programs that allow invocation of the
    paths that lead to obtaining an input from the host/VMM. Fortunately,
    the Linux kernel has a well-known tool for exercising the kernel in
-   runtime – syzkaller fuzzer. While being a fuzzing tool that was
-   originally created to test the robustness of ring3 to ring0
-   interfaces, syzkaller fuzzer can be used to automatically generate a
+   runtime – Syzkaller fuzzer. While being a fuzzing tool that was
+   originally created to test the robustness of ring 3 to ring 0
+   interfaces, Syzkaller fuzzer can be used to automatically generate a
    set of stimulus programs once it is modified to understand whenever a
    code path that triggers an input from the host/VMM is invoked.
-   However, the biggest problem with using syzkaller in this way is to
+   However, the biggest problem with using Syzkaller in this way is to
    create a bias towards executing syscalls that would end up consuming
    the input from the host/VMM. This remains a direction for future
    research.

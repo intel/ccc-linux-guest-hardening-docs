@@ -210,6 +210,9 @@ html_show_copyright = True
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'clrdoc'
 
+def setup(app):
+   app.add_stylesheet("css/table-wrap.css")
+
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {

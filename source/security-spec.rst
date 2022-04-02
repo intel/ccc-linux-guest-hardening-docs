@@ -500,7 +500,7 @@ Most of the above CPUID leaves result in different feature bits and
 therefore are harmless. The ones that have larger fields have been
 audited and fuzzed in the same way as other untrusted inputs from the
 hypervisor. In addition, it is also possible to sanitize multi-bit
-CPUIDS against the bounds expected for a given platform.
+CPUIDs against the bounds expected for a given platform.
 
 2.9 IOMMU
 ---------
@@ -565,7 +565,7 @@ is not secure anymore because it uses untrusted input from the host. To
 avoid this the kvmclock has been disabled by default when running inside
 a TDX guest. It would also be possible for the host to trigger a TSC
 fallback (e.g. by not scheduling VCPUs or delaying IPIs), which also
-would lead to insecure time. We’ve also disabledg acpi\_pm to prevent
+would lead to insecure time. We have also disabled acpi\_pm to prevent
 fallback to that. Additionally, the TSC watchdog is also disabled (by
 forcing the X86\_FEATURE\_TSC\_RELIABLE bit) to avoid the possible
 fallback to jiffy time, which could be influenced by the host by
@@ -661,7 +661,7 @@ instruction.
 According to the TDX module specification, if the TDX guest attempts to
 accept the page that is already in the PRESENT state (essentially do a
 double accept by chance), then the TDX module has a way to detect this
-and supply a warning, so accepting an already accepted page is ok.
+and supply a warning, so accepting an already accepted page is OK.
 
 However, it is possible that that malicious host/VMM can execute the
 sequence of TDH.MEM.RANGE.BLOCK; TDH.MEM.TRACK; and TDH.MEM.PAGE.REMOVE
@@ -684,7 +684,7 @@ SYSCALL/SYSRET. There is a small instruction window where the kernel
 runs with the user stack pointer. If a #VE event (for example due to a
 malicious hypervisor removing a memory page as explained in the above
 section) happens in that window, it would allow a malicious userspace
-(ring 3) process in the guestto take over the guest kernel. As a result,
+(ring 3) process in the guest to take over the guest kernel. As a result,
 it must be ensured that it is not possible to get a #VE event on the
 pages containing kernel code or data. For this reason, Linux guest
 kernel verifies that ATTRIBUTES.SEPT\_VE\_DISABLE TD attribute is set
@@ -718,7 +718,7 @@ In a simple reference configuration the TDVF loads the kernel,
 the initrd, and a startup script from an
 unencrypted UEFI VFAT volume in the guest storage area through virtio.
 The startup script contains the kernel command line. The kernel is
-booted through the Linux uEFI stub. Before booting the TDVF runs hashes
+booted through the Linux UEFI stub. Before booting the TDVF runs hashes
 over the kernel image/initrd/startup script and attest those to a key
 server through the SEAM measurement registers.
 

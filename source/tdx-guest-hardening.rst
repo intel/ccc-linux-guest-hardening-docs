@@ -409,7 +409,7 @@ statuses:
      - The consumed input comes from a trusted source for Intel TDX guest, i.e.
        it is provided by the TDX module or context-switched for every TDX guest
        (i.e. native). This is applicable for both MSRs and CPUIDs. More information
-       can be found in :ref:`sec-msrs` and :ref:`sec-sec-cpuids`.
+       can be found in :ref:`sec-msrs` and :ref:`sec-cpuids`.
    * - safe
      - The consumed host input looks to be used in a secure way
    * - concern

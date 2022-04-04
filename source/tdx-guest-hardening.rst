@@ -562,7 +562,7 @@ We have adopted the `kAFL Fuzzer
 <https://github.com/IntelLabs/kAFL>`__ for effective feedback fuzzing of the Linux
 bootstrapping phase. Using a combination of fast VM snapshots and kernel
 hooks, kAFL allows flexible harnessing of the relevant kernel
-sub-systems, fast recovery from beningn error conditions, and automated
+sub-systems, fast recovery from benign error conditions, and automated
 reporting of any desired errors and exceptions handlers.
 
 .. figure:: images/kAFL-overview.png
@@ -759,7 +759,7 @@ smatch static analyzer. We considered the following options:
    using existing test suites or creating new ones can be a method that
    would programmatically exercise the existing TD guest kernel runtime
    code paths and produce a set of programs that allow invocation of the
-   paths that lead to obtaining an unput from the host/VMM. Fortunately,
+   paths that lead to obtaining an input from the host/VMM. Fortunately,
    the Linux kernel has a well-known tool for exercising the kernel in
    runtime – syzkaller fuzzer. While being a fuzzing tool that was
    originally created to test the robustness of ring3 to ring0

@@ -1,0 +1,4 @@
+/* https://knowyourtoolset.com/2018/02/controlling-the-width-of-a-table-with-read-the-docs/ */
+.wrapped-table td {
+    white-space: normal !important
+}

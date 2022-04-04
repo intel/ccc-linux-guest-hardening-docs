@@ -119,8 +119,8 @@ ACPI table, or KVM CPUID functionality that is required for a particular
 deployment scenario.
 
 .. list-table:: Filter status
-   :widths: 10 30
    :header-rows: 1
+   :class: wrapped-table
 
    * - Filter name
      - Purpose and current state
@@ -181,8 +181,8 @@ of the code involved, as well as the fact that this functionality is not
 needed for the TD guest kernel.
 
 .. list-table:: Features
-   :widths: 15 60
    :header-rows: 1
+   :class: wrapped-table
 
    * - Feature type
      - Description
@@ -383,8 +383,8 @@ Each finding is therefore manually classified into one of the following
 statuses:
 
 .. list-table:: Findings
-   :widths: 15 60
    :header-rows: 1
+   :class: wrapped-table
 
 
    * - **Status**

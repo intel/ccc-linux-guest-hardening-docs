@@ -304,8 +304,8 @@ The table below shows the allow list ports in the current TDX guest
 kernel:
 
 .. list-table:: List ports
-   :widths: 7 7 10
    :header-rows: 1
+   :class: wrapped-table
 
 
    * - Port range
@@ -366,8 +366,8 @@ Unsafe CPUIDs
 ~~~~~~~~~~~~~
 
 .. list-table:: Unsafe CPUIDs
-   :widths: 20 55
    :header-rows: 1
+   :class: wrapped-table
 
    * - CPUID
      - Notes
@@ -427,8 +427,8 @@ The table below lists the CPUID leaves that can be supplied by the
 untrusted Host/VMM:
 
 .. list-table:: CPUID leaves
-   :widths: 15 20 40
    :header-rows: 1
+   :class: wrapped-table
 
    * - Cpuid Leaf
      - Purpose

@@ -254,8 +254,7 @@ There are two types of MSRs that are controlled by the TDX module:
    such an MSR (for example, all IA32\_VMX\_\* KVM MSRs).
 
 All these MSRs are controlled by the platform, are trusted, and do not
-require any hardening. See 18.1 in https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf for the exact
-list.
+require any hardening. See section 18.1 in `Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_ for the exact list.
 
 MSRs proxied through TDVMCALL and controlled by host
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -350,9 +349,9 @@ by disabling KVM CPUIDs:
 
  - KVM\_HC\_KICK\_CPU
 
-There are more KVM hypercalls supported by the KVM host, but they don’t
-seem to be used by the Linux guest.See
-Documentation/virt/kvm/hypercalls.rst for detailed specifications.
+There are other KVM hypercalls supported by the KVM host, 
+but they are not used by the Linux guest.
+See `KVM hypercalls description <https://www.kernel.org/doc/Documentation/virt/kvm/hypercalls.rst>`_ for detailed information.
 
 .. _sec-kvm-cpuid:
 
@@ -415,7 +414,7 @@ CPUID
 
 Reading untrusted CPUIDs could be used to let the guest kernel execute
 non-hardened code paths. The TDX module ensures that most CPUID values
-are trusted (see 18.2 in https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf), but some are configurable
+are trusted (see section 18.2 in `Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_), but some are configurable
 via the TD\_PARAMS structure or can be provided by the untrusted
 host/VMM via the logic implemented in #VE handler.
 
@@ -600,8 +599,7 @@ ACPI table mappings and similar table mappings use the ioremap\_cache
 interface, which is never set to shared with the untrusted host/VMM.
 
 ACPI tables are (mostly) controlled by the host and only passed through
-the TDVF (TDX guest virtual firmware,
-see https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.01.pdf for more information).
+the TDVF (see `TDX guest virtual firmware <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.01.pdf>`_ for more information).
 They should be attested and therefore trusted. However, we
 cannot expect that an attesting entity fully understands what causes the
 Linux kernel to open security holes based on some particular AML. Then a
@@ -658,7 +656,7 @@ in the PENDING state before the TDX guest explicitly accepts this page
 (secure EPT entry moves to PRESENT state) using the TDG.MEM.PAGE.ACCEPT
 instruction.
 
-According to the TDX module specification, if the TDX guest attempts to
+According to the `Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_, if the TDX guest attempts to
 accept the page that is already in the PRESENT state (essentially do a
 double accept by chance), then the TDX module has a way to detect this
 and supply a warning, so accepting an already accepted page is OK.

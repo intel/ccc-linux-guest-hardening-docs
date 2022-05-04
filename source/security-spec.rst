@@ -627,15 +627,17 @@ TDX guest private memory page management
 ========================================
 
 All TDX guest private memory pages are allocated by the host and must be
-explicitly “accepted” into the guest using the TDACCEPT command. The TDX
+explicitly “accepted” into the guest using the TDG.MEM.PAGE.ACCEPT command. The TDX
 guest kernel needs to make sure that an already accepted page is not
 accepted again, because doing so would change the content of the guest
 private page to a zero page with possible security implications (zeroing
 out keys, secrets, etc.). Additionally, per current design of the TDX
-module, TDX guest memory access to a non-accepted page results in a #VE
-inserted by the TDX guest module. It is very important for security that
-it does not happen during certain TDX guest critical code paths (see
-`Safety against #VE in kernel code`_ for more details).
+module (and given that a TD guest opts-in for such notifications), certain events
+(like TDX guest memory access to a non-accepted page) can result in a #VE
+inserted by the TDX guest module. Please see section 16.3.3 in
+`Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_ for more details. For the Linux kernel
+is very important that such #VE notifications do not happen during certain TDX
+guest critical code paths (see `Safety against #VE in kernel code`_ for more details).
 
 TDVF conversion
 ---------------
@@ -663,8 +665,8 @@ and supply a warning, so accepting an already accepted page is OK.
 
 However, it is possible that that malicious host/VMM can execute the
 sequence of TDH.MEM.RANGE.BLOCK; TDH.MEM.TRACK; and TDH.MEM.PAGE.REMOVE
-calls on any present private page.Then it can quickly add it back with
-TDH.MEM.PAGE.AUG, and it goes into pending state.If the guest does not
+calls on any present private page. Then it can quickly add it back with
+TDH.MEM.PAGE.AUG, and it goes into pending state. If the guest does not
 verify that it has previously accepted this page and accepts it again,
 it would end up using a zero page instead of data it previously had
 there. So, re-accept can happen if there is no TDX guest internal
@@ -684,10 +686,27 @@ malicious hypervisor removing a memory page as explained in the above
 section) happens in that window, it would allow a malicious userspace
 (ring 3) process in the guest to take over the guest kernel. As a result,
 it must be ensured that it is not possible to get a #VE event on the
-pages containing kernel code or data. For this reason, Linux guest
-kernel verifies that ATTRIBUTES.SEPT\_VE\_DISABLE TD attribute is set
-to 1 to prohibit the delivery of #VE exceptions when accessing a private
-GPA for which the Secure EPT entry state is PENDING.
+pages containing kernel code or data.
+
+Such #VE events are currently possible in two cases:
+
+1. TD guest accesses a private GPA for which the Secure EPT entry is
+in PENDING state and ATTRIBUTES.SEPT\_VE\_DISABLE TD guest attribute is not set. 
+2. TDX module can raise a #VE as a notification mechanism when it detects
+excessive Secure EPT violations raised by the same TD instruction 
+(zero-step attack is detected by TDX module). This is only done if
+bit 0 of TDCS.NOTIFY_ENABLES field is set. 
+
+To ensure the above situations do not occur, the TD Linux guest kernel
+requires that ATTRIBUTES.SEPT\_VE\_DISABLE is set, and that bit 0 of
+TDCS.NOTIFY\_ENABLES is not set. These values are checked during TD guest
+initialization.
+
+Although this disables TDX module notifications for excessive numbers
+of Secure EPT violations, the basic defenses against zero-stepping
+provided by the TDX module are still in effect.
+For more details please see section 16.3 in
+`Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_
 
 Panic
 =====

@@ -690,9 +690,9 @@ pages containing kernel code or data.
 
 Such #VE events are currently possible in two cases:
 
-1. TD guest accesses a private GPA for which the Secure EPT entry is
+(1) TD guest accesses a private GPA for which the Secure EPT entry is
 in PENDING state and ATTRIBUTES.SEPT\_VE\_DISABLE TD guest attribute is not set. 
-2. TDX module can raise a #VE as a notification mechanism when it detects
+(2) TDX module can raise a #VE as a notification mechanism when it detects
 excessive Secure EPT violations raised by the same TD instruction 
 (zero-step attack is detected by TDX module). This is only done if
 bit 0 of TDCS.NOTIFY_ENABLES field is set. 

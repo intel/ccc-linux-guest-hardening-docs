@@ -550,6 +550,51 @@ In the following we review options we considered for generating potential
 relevant userspace activity and fuzzing the various relevant input interfaces
 during boot as well as during runtime.
 
+TDX emulation setup
+===================
+
+Running a fully functional TDX guest requires CPU and HW support that is only
+available starting from Intel Sapphire Rapids (SPR) CPUs. On contrary, our TDX
+emulation setup allows testing SW running inside TDX guest VM early on and independent of the
+actual SPR HW availability. It can be run on any recent and commonly available Intel
+platforms without any special HW features. However it is important to note that
+this emulation setup is very limited in the amount of features it supports
+and absolutely unsecure: emulated TDX guest runs under full control of the host
+and VMM.
+
+The main challenge for the setup is the emulation of the Intel TDX module.
+Intel TDX module is a special SW module that plays a role of a secure shim between
+the TDX host and TDX guest and provides an extensive API towards both VMM and TDX guest.
+However, since our goal is only fuzzing of the TDX guest kernel,
+we need a minimal emulation of the TDX Seam module that can support the basic set
+of calls that TDX guest does towards the TDX module,
+as well as wrapping such calls into existing kvm interfaces.
+For more details about the actual Intel TDX module and its functionality please see
+`Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_
+
+
+Implementation details
+----------------------
+The TDX emulation setup is implemented as a simple Linux kernel module with the
+code in arch/x86/kvm/vmx/seam.c. Whenever the core TDX code in KVM performs
+basic lifecycle operations on the TDX guest (initialization, startup, destruction,
+etc.) it would call the respected functions in the TDX emulation setup (seam_tdcreatevp,
+seam_tdinitvp/tdfreevp, seam_tdenter, etc.) instead of the actual TDX functions.
+The emulated seam module supports a minimal set of exit reasons from the TDX guest
+(including EXIT_REASON_TDCALL, EXIT_REASON_CPUID, EXIT_REASON_EPT_VIOLATION) and
+inserts a #VE exception into an emulated TDX guest when the guest performs
+operations on MSRs, CPUIDs, portIO and MMIO, as well as on guest's EPT violations.
+Emulation performed by the TDX emulation setup is currently not exact but mainly focused
+on exercising and testing the relevant TDX support by the guest OS.
+Please refer to section 24 of 
+`Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_ for official guidance on TDX module interfaces. 
+For example, for the emulation of the MSRs and CPUIDs virtualization the emulated seam
+ module does not adhere to the TDX module specification on MSR and CPUID accesses
+outlined in section 19 of 
+`Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_ Instead it just inserts a #VE event on most of the MSRs
+operations and for the CPUID leaves greater than 0x1f or outside of 0x80000000u-0x80000008u
+range. The code in arch/x86/kvm/vmx/seam.c: seam_inject_ve() function can be checked
+for up-to-date details. 
 
 Fuzzing Kernel Boot
 ===================
@@ -575,6 +620,7 @@ reporting of any desired errors and exceptions handlers.
    fuzzing harness 3) input fuzz buffer from host 4) MSR/PIO/MMIO causes a
    #VE 5) the agent injects a value obtained from 6) the input buffer 7)
    finally, reporting back the status to the host (crash/hang/ok)
+   
 
 Agent
 -------

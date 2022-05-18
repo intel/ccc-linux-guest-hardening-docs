@@ -743,6 +743,38 @@ disabling various security features or injecting unsafe code. However,
 we assume that the kernel command line is trusted, which is ensured by
 measuring its contents by the TDVF into TDX attestation registers.
 
+The following command options are currently supported by TD guest kernel:
+
+1. **tdx_disable_filter**. This option completely turns off the TDX
+device filter: guest kernel will allow loading of arbitrary device drivers
+in this mode. Additionally, a lot of explicitly disabled functionally
+(like pci quirks, enhanced pci capabilities, pci bridge support and others),
+will no longer be disabled and the respected unhardened linux guest code
+becomes reachable for the interaction with an untrusted host/VMM.
+For more detailed information on what functionality is guarded by the TDX
+device filter, see conditional checks cc_platform_has(CC_ATTR_GUEST_DEVICE_FILTER)
+in the kernel source code. Note that the port IO filter is also disabled in this mode.
+As a result, passing tdx_disable_filter option via TD guest command line
+enables a lot of unhardened code in the attack surface between an untrusted
+host/VMM and TDX Linux guest kernel. The remote attester must always verify
+that this option has not been used to start a TDX guest kernel via the TDX
+attestation quote.
+
+2. **authorize_allow_devs=**. This option allows to specify a list of allowed
+devices in addition to the explicit list specified by TDX filter. However,
+this option is only intended for the debug purpose and should not be used
+in production since there is a high risk to enable devices this way that
+haven't been hardened to withstand a potentially malicious host input.
+Instead, when a new device needs to be added to the TDX filter default allow
+list, the steps from `Enabling additional kernel drivers <https:TBD>`_ must
+be followed. 
+
+3. **tdx_allow_acpi=**. This option allows passing additional allowed acpi
+tables to the default list specified in the TDX filter. Similarly, as the
+above option, it should be only used for the debug purpose. If an
+additional acpi table needs to be used in TDX guest, it should be included
+in the default TDX filter list after a security audit and risk assessment.    
+
 Storage protection
 ==================
 
@@ -815,6 +847,7 @@ virtio\_to\_cpu macros and their higher-level wrappers, which are also
 used for auditing and injecting the fuzzing input. However, there still
 can be other accesses to the shared memory that must be manually audited
 and instrumented for fuzzing.
+
 
 Summary
 =======

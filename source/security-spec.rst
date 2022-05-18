@@ -422,8 +422,8 @@ Since the TD\_PARAMS structure is measured into TDX measurement
 registers and can be attested later, the CPUID bits that are configured
 using this structure can be considered trusted.
 
-The table below lists the CPUID leaves that can be supplied by the
-untrusted Host/VMM:
+The table below lists the CPUID leaves that result in a #VE inserted by
+the TDX module. 
 
 .. list-table:: CPUID leaves
    :widths: 15 20 40
@@ -492,7 +492,7 @@ untrusted Host/VMM:
      - AMD Advanced Power Management
      -
    * - 0x40000000- 0x400000FF
-     - MSRs reserved for SW use
+     - Reserved for SW use
      -
 
 Most of the above CPUID leaves result in different feature bits and
@@ -500,6 +500,13 @@ therefore are harmless. The ones that have larger fields have been
 audited and fuzzed in the same way as other untrusted inputs from the
 hypervisor. In addition, it is also possible to sanitize multi-bit
 CPUIDs against the bounds expected for a given platform.
+
+However, to strengthen security even further, the #VE handler in TDX
+guest kernel has been recently modified to only allow leaves in the
+range 0x40000000 - 0x400000FF to be requested from the untrusted host/VMM.
+If SW inside TDX guest tries to read any other leaf from the above table,
+the value of 0 is returned.
+
 
 2.9 IOMMU
 ---------

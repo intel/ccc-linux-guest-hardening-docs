@@ -139,37 +139,35 @@ In the current Linux implementation user MMIO is not supported
 and results in SIGSEGV. Therefore, it cannot be used to attack
 the kernel (other than DoS).
 
-APIC
-----
+Interrupt handling and APIC
+---------------------------
 
-Interrupts are controlled by the host and therefore the guest kernel
-code that handles them must be audited and fuzzed as any other code that
-receives malicious host input See :ref:`tdx-guest-hardening` for more details
-on such hardening.
+TDX guest must use virtualized x2APIC mode.
+Legacy xAPIC (using MMIO) is disabled via special checks in the
+guest's kernel APIC code, as well as enforced by the TDX module.
 
-X2APIC
-~~~~~~
+The x2APIC MSRs are either proxied through the TDVMCALL hypercall
+(and handled by the untrusted hypervisor) or handled as access
+to a VAPIC page. The later ones are considered trusted, but the
+first group requires hardening similar as untrusted MSR access
+described in `MSRs proxied through TDVMCALL and controlled by host`_.
+For the detailed description on specific x2APIC MSR behavior
+please see section 10.9 in `Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_.
 
-The X2APIC MSRs are proxied through TDVMCALLs and handled by the
-untrusted hypervisor.
+Untrusted VMM can inject both non-NMI interrupts (via posted-interrupt
+mechanism) or NMI interrupts. However, TDX module does not allow VMM
+injecting interrupt vectors in range 0-30 via posted-interrupt mechanism,
+which drastically reduces the exposed attack surface towards the untrusted VMM. 
+The rest of above interrupts are considered controlled by the host and
+therefore the guest kernel code that handles them must be audited and
+fuzzed as any other code that receives malicious host input.
 
-The X2APIC code should hardened by performing code audit and fuzzing as
-outlined in :ref:`tdx-guest-hardening`.
-
-IPIs
-~~~~
-
-IPIs are initiated by triggering TDVMCALL on the X2APIC ICR MSRs. The
+IPIs are initiated by triggering TDVMCALL on the x2APIC ICR MSRs. The
 host controls the delivery of the IPI, so IPIs might get lost. We need
 to make sure all missing IPIs result in panics or stop the operation (in
 case the timeout is controlled by the host). This should be already
-handled by the normal timeout in smp\_call\_function\*()
+handled by the normal timeout in smp\_call\_function\*().
 
-Legacy MMIO XAPIC
-~~~~~~~~~~~~~~~~~
-
-We will not support legacy XAPIC; we will use special checks in the kernel
-APIC code to disallow it.
 
 PCI config space
 ----------------

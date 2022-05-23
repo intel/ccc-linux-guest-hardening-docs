@@ -116,7 +116,7 @@ instruction decoder. We only care about users that read from MMIO.
 Kernel MMIO
 ~~~~~~~~~~~
 
-By default, all MMIO regions reside in the TDX guest private memory and
+By default, all MMIO regions reside in the TDX guest private memory
 are not accessible to the host/VMM. To explicitly share a MMIO region,
 the device must be authorized through the device filter framework,
 enabling MMIO operations. The handling of the
@@ -125,8 +125,8 @@ MMIO input from the untrusted host/VMM must be hardened (see
 
 The static code analysis tool should generate a list of all MMIO users
 based on use of the standard io.h macros. All portable code should use
-these macros. The only known exception to this is the MMIO APIC direct
-accesses, which should be disabled.
+these macros. The only known exception to this is the legacy MMIO APIC
+direct accesses, which is disabled (see `Interrupt handling and APIC`_ ).
 
 Open: there might be other non-portable (x86-specific) code that does
 not use the io.h macros, but directly accesses IO mappings. Sparse
@@ -418,7 +418,7 @@ Reading untrusted CPUIDs could be used to let the guest kernel execute
 non-hardened code paths. The TDX module ensures that most CPUID values
 are trusted (see section 18.2 in `Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_), but some are configurable
 via the TD\_PARAMS structure or can be provided by the untrusted
-host/VMM via the logic implemented in #VE handler.
+host/VMM via the logic implemented in the #VE handler.
 
 Since the TD\_PARAMS structure is measured into TDX measurement
 registers and can be attested later, the CPUID bits that are configured
@@ -712,17 +712,17 @@ provided by the TDX module are still in effect.
 For more details please see section 16.3 in
 `Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_
 
-Panic
-=====
+Reliable panic
+==============
 
 In various situations when the TDX guest kernel detects a potential
 security problem, it needs to reliably stop. Standard panic performs
 many complex actions:
 
--  IPIs to other CPUs to stop them. This is not secure because the IPI
+* IPIs to other CPUs to stop them. This is not secure because the IPI
    is controlled by the host, which could choose not to execute them.
 
--  There can be notifiers to other drivers and subsystems which can do
+* There can be notifiers to other drivers and subsystems which can do
    complex actions, including something that would cause the panic to
    wait for a host action.
 
@@ -741,7 +741,7 @@ unencrypted UEFI VFAT volume in the guest storage area through virtio.
 The startup script contains the kernel command line. The kernel is
 booted through the Linux UEFI stub. Before booting the TDVF runs hashes
 over the kernel image/initrd/startup script and attest those to a key
-server through the SEAM measurement registers.
+server through the TDX measurement registers.
 
 Kernel command line
 ===================

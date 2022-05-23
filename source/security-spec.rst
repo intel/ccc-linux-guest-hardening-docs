@@ -719,10 +719,10 @@ In various situations when the TDX guest kernel detects a potential
 security problem, it needs to reliably stop. Standard panic performs
 many complex actions:
 
-* IPIs to other CPUs to stop them. This is not secure because the IPI
+1. IPIs to other CPUs to stop them. This is not secure because the IPI
    is controlled by the host, which could choose not to execute them.
 
-* There can be notifiers to other drivers and subsystems which can do
+2. There can be notifiers to other drivers and subsystems which can do
    complex actions, including something that would cause the panic to
    wait for a host action.
 

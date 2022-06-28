@@ -893,7 +893,7 @@ interfaces.
 
 To facilitate the task of identifying potential Spectre v1 gadgets in the new
 attack surface between an untrusted host/VMM <-> TDX guest Linux kernel, the `Smatch <http://smatch.sourceforge.net/>`_ static analyzer can be used.
-It has an existing `check_spectre.c <<https://repo.or.cz/smatch.git/blob/HEAD:/check_spectre.c>`_
+It has an existing `check_spectre.c <https://repo.or.cz/smatch.git/blob/HEAD:/check_spectre.c>`_
 pattern that has been recently enhanced to find potential Spectre v1 gadgets
 on the data that can be influenced by an untrusted host/VMM using
 `TDVMCALL-hypercall-based communication interfaces`_ interfaces, such as MSR,

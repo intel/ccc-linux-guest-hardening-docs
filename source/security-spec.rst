@@ -887,15 +887,13 @@ host/VMM can provide inputs to a TDX guest kernel via a wider range of
 interfaces. Examples of such interfaces include shared memory as well
 as the `TDVMCALL-hypercall-based communication interfaces`_ described
 above.
- A Linux kernel running inside a TDX guest should take additional
+A Linux kernel running inside a TDX guest should take additional
 measures to mitigate any potential Spectre v1 gadgets involving such
 interfaces.
 
 To facilitate the task of identifying potential Spectre v1 gadgets in the new
-attack surface between an untrusted host/VMM <-> TDX guest Linux kernel, the
-`Smatch <<http://smatch.sourceforge.net/>`_ static analyzer can be used.
-It has an existing `check_spectre.c
-<<https://repo.or.cz/smatch.git/blob/HEAD:/check_spectre.c>`_
+attack surface between an untrusted host/VMM <-> TDX guest Linux kernel, the `Smatch <http://smatch.sourceforge.net/>`_ static analyzer can be used.
+It has an existing `check_spectre.c <<https://repo.or.cz/smatch.git/blob/HEAD:/check_spectre.c>`_
 pattern that has been recently enhanced to find potential Spectre v1 gadgets
 on the data that can be influenced by an untrusted host/VMM using
 `TDVMCALL-hypercall-based communication interfaces`_ interfaces, such as MSR,
@@ -919,8 +917,7 @@ the same variable needs to be unset:
          unset ANALYZE_HOST_DATA
 
 For more information on how to setup smatch and use it to perform
-analysis of the linux kernel please refer to `Smatch documentation
-<https://repo.or.cz/smatch.git/blob/HEAD:/Documentation/smatch.txt>`_.
+analysis of the linux kernel please refer to `Smatch documentation <https://repo.or.cz/smatch.git/blob/HEAD:/Documentation/smatch.txt>`_ .
 
 The output of the smatch check_spectre.c pattern is a list of
 potential Spectre v1 gadgets applicable to the analyzed Linux kernel
@@ -932,14 +929,14 @@ format:
 
 .. code-block:: bash
 
-arch/x86/kernel/tsc_msr.c:191 cpu_khz_from_msr() warn: potential
-spectre issue 'freq_desc->muldiv' [r]
-arch/x86/kernel/tsc_msr.c:206 cpu_khz_from_msr() warn: potential
-spectre issue 'freq_desc->freqs' [r]
-arch/x86/kernel/tsc_msr.c:207 cpu_khz_from_msr() warn: possible
-spectre second half.  'freq'
-arch/x86/kernel/tsc_msr.c:210 cpu_khz_from_msr() warn: possible
-spectre second half.  'freq'
+	arch/x86/kernel/tsc_msr.c:191 cpu_khz_from_msr() warn: potential
+	spectre issue 'freq_desc->muldiv' [r]
+	arch/x86/kernel/tsc_msr.c:206 cpu_khz_from_msr() warn: potential
+	spectre issue 'freq_desc->freqs' [r]
+	arch/x86/kernel/tsc_msr.c:207 cpu_khz_from_msr() warn: possible
+	spectre second half.  'freq'
+	arch/x86/kernel/tsc_msr.c:210 cpu_khz_from_msr() warn: possible
+	spectre second half.  'freq'
 
 
 Each reported item needs to be manually analyzed to determine if it is
@@ -953,11 +950,7 @@ automatic filtering of the results, but its list of allowed drivers
 needs to be adjusted to reflect the TDX guest kernel under analysis.
 For the items that are determined to be potential Spectre v1 gadgets
 during the manual analysis phase, the recommended mitigations listed
-in `Analyzing Potential Bounds Check Bypass Vulnerabilities
-<https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/analyzing-bounds-check-bypass-vulnerabilities.html>
-`_ should be followed.
-
-
+in `Analyzing Potential Bounds Check Bypass Vulnerabilities <https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/analyzing-bounds-check-bypass-vulnerabilities.html>`_ should be followed.
 
 Summary
 =======

@@ -211,7 +211,7 @@ html_show_copyright = True
 htmlhelp_basename = 'clrdoc'
 
 def setup(app):
-   app.add_stylesheet("css/table-wrap.css")
+   app.add_css_file("css/table-wrap.css")
 
 # -- Options for LaTeX output ---------------------------------------------
 

@@ -1030,7 +1030,7 @@ is registered for (typically it would be a pci or acpi bus), as well as
 how the driver registration is done, how to perform functional testing
 for this driver and any higher-level interface abstractions present.
 
-**Example**. For our `virtio-vsock` driver example, the source code of this
+**Example**. For our :code:`virtio-vsock` driver example, the source code of this
 driver is located at `/net/vmw_vsock/virtio_transport.c <https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-4/net/vmw_vsock/virtio_transport.c>`_ and the driver
 registers itself on the virtio bus (an abstraction level over the pci bus)
 using `register_virtio_driver() <https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-4/net/vmw_vsock/virtio_transport.c#L754>`_.
@@ -1040,15 +1040,15 @@ Perform code audit
 
 In this step, the source code of the driver
 is manually audited to determine the input points where the untrusted data
-from the host or _VMM_ is consumed and how this data is being processed.
-In order to facilitate the manual audit, the `check_host_input` smatch pattern can
+from the host or `VMM` is consumed and how this data is being processed.
+In order to facilitate the manual audit, the :code:`check_host_input` smatch pattern can
 be used to identify these input points. For that, a smatch run can be done on
-an individual driver source file using kchecker command.
+an individual driver source file using :code:`kchecker` command.
 
-**Example**. The below command line for virtio-vsock driver assumes
+**Example**. The below command line for :code:`virtio-vsock` driver assumes
 that you have
-a smatch instance with the `check_host_input` pattern installed at
-`~/smatch` folder and the command is invoked from the kernel source tree root.
+a smatch instance with the :code:`check_host_input` pattern installed at
+:code:`~/smatch` folder and the command is invoked from the kernel source tree root.
 For the instructions on how to install smatch please consult
 `README.md <https://github.com/intel/ccc-linux-guest-hardening/blob/master/bkc/audit/README.md>`_
 
@@ -1056,7 +1056,7 @@ For the instructions on how to install smatch please consult
 
       ~/smatch_scripts/kchecker net/vmw_vsock/virtio_transport.c > driver_results
 
-The `driver_results` output file will contain the list of input points
+The :code:`driver_results` output file will contain the list of input points
 and the limited
 propagation information:
 
@@ -1104,7 +1104,7 @@ propagation information:
 
 Given this information the manual code audit can be performed by looking at each
 reported entry in the source code to determine whenever the input consumed
-from host or _VMM_ is processed securely. Please consult section `Static Analyzer and Code Audit`_
+from host or `VMM` is processed securely. Please consult section `Static Analyzer and Code Audit`_
 for more information on how to interpret each reported entry and how to perform
 manual analysis. The output of this step is a list of entries that are marked
 'concern' that would require patches to be created in order to harden
@@ -1114,7 +1114,7 @@ Perform driver fuzzing
 ----------------------
 
 Ideally each code location reported by the smatch
-in step 2 needs to be exercised by using either kafl or kfx fuzzers (or both).
+in step 2 needs to be exercised by using either `kafl` or `kfx` fuzzers (or both).
 However, if resource or timing is very limited, the fuzzing can be
 primary focused
 only on the 'concern' entries from the step 2 or on any other entries
@@ -1138,11 +1138,11 @@ smatch does not report any hits in driver’s init or probe functions,
 because smatch can miss some host input consumption points in some
 cases and fuzzing can help discover such cases.
 
-**Example**. Enabling fuzzing targets like the `virtio-vsock` driver
+**Example**. Enabling fuzzing targets like the :code:`virtio-vsock` driver
 requires some manual work and modifications of the fuzzing setup (as
-opposite to more straightforward examples like `virtio-net` or
-`virtio-console`) and below steps explain how to add support for such a
-target. In a nutshell, `virtio-vsock` sets up a socket on the host or _VMM_,
+opposite to more straightforward examples like :code:`virtio-net` or
+:code:`virtio-console`) and below steps explain how to add support for such a
+target. In a nutshell, :code:`virtio-vsock` sets up a socket on the host or _VMM_,
 allowing a host process to setup a direct socket connection to the
 guest VM over _VirtIO_. For fuzzing, this requires some initial setup in
 the host, as well as establishing a connection from the guest.
@@ -1150,36 +1150,36 @@ It is also important to make sure that the targeted device is allowed
 by the device filter when performing the fuzzing. See  
 `Enable driver in the TDX filter`_  below for the instructions. 
 
-**Host steps**. First, the _VMM_ host kernel must support _VSOCK_. The
-corresponding kernel module can be loaded using `modprobe vhost_vsock`.
+**Host steps**. First, the _VMM_ host kernel must support :code:`VSOCK`. The
+corresponding kernel module can be loaded using :code:`modprobe vhost_vsock`.
 If this fails, it might be required to install a
-different kernel which has `CONFIG\_VHOST\_VSOCK` set. When the
-`vhost_vsock` driver is enabled, a device shall appear at
-`/dev/vhost-vsock`. Its default permissions might be insufficient for
-_QEMU_ to access, but it can be fixed by executing `chmod 0666
-/dev/vhost-vsock`. Now that the `vhost-vsock` device is available to
+different kernel which has :code:`CONFIG_VHOST_VSOCK` set. When the
+:code:`vhost_vsock` driver is enabled, a device shall appear at
+:code:`/dev/vhost-vsock`. Its default permissions might be insufficient for
+_QEMU_ to access, but it can be fixed by executing :code:`chmod 0666 /dev/vhost-vsock`.
+Now that the :code:`vhost-vsock` device is available to
 _QEMU_, the device for the guest VM can be enabled by appending the
-string `-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=3` to
+string :code:`-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=3` to
 QEMU options. The guest-cid value is a connection identifier that
 needs to be unique for the system. In other words, when fuzzing with
 multiple workers, each _QEMU_ instance must use a separate guest-cid.
 For kAFL we have added some syntax magic to allow for these
-kinds of situations. In your `kafl_config.yaml` (by default found in
-`$BKC_ROOT/bkc/kafl/kafl_config.yaml`),  the following string can be
-appended to the `qemu_base` entry: `-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid={QEMU_ID + 3}`.
-The expression `QEMU_ID + 3`, will evaluate to the _QEMU_ worker instance id
+kinds of situations. In your :code:`kafl_config.yaml` (by default found in
+:code:`$BKC_ROOT/bkc/kafl/kafl_config.yaml`),  the following string can be
+appended to the :code:`qemu_base` entry: :code:`-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid={QEMU_ID + 3}`.
+The expression :code:`QEMU_ID + 3`, will evaluate to the _QEMU_ worker instance id
 (which is unique) plus 3. We need to add 3, since the vsock guest cid
 range starts at 3. _CIDs_ 0,1,2 are reserved for the hypervisor,
 generally reserved, and reserved for the host respectively. Now each
 fuzzing worker instance should get its own unique _CID_, allowing a
 connection to be made from the guest to the host. Finally, to be able
-to test vsock and setup connections, the `socat` utility can be used.
-While `socat` can be already installed on your fuzzing system, the socat
+to test vsock and setup connections, the :code:`socat` utility can be used.
+While :code:`socat` can be already installed on your fuzzing system, the socat
 vsock support is a recent addition and it might be required to
 download or build a more recent version of socat to enable this
 functionality. Pre-built binaries and the source code is available at
 `socat project page <http://www.dest-unreach.org/socat/>`_ To test
-whether the installed `socat` supports vsock execute: `socat VSOCK-LISTEN:8089,fork`.
+whether the installed :code:`socat` supports vsock execute: :code:`socat VSOCK-LISTEN:8089,fork`.
 
 To summarize, these are the main steps to be performed on the host:
 
@@ -1189,24 +1189,24 @@ To summarize, these are the main steps to be performed on the host:
 	chmod 0666 /dev/vhost-vsock
 	qemu: -device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=3
 
-**Guest steps**. The next step in enabling `virtio-vsock` fuzzing is to
+**Guest steps**. The next step in enabling :code:`virtio-vsock` fuzzing is to
 set up the kAFL userspace fuzzing harness in the following way.
 
-First, the guest kernel needs to be compiled with `vsock` support
-(`CONFIG_VIRTIO_VSOCKET=y` and `CONFIG_VHOST_VSOCK=y`). Alternatively, it
+First, the guest kernel needs to be compiled with :code:`vsock` support
+(:code:`CONFIG_VIRTIO_VSOCKET=y` and :code:`CONFIG_VHOST_VSOCK=y`). Alternatively, it
 can be also enabled as a kernel module, but this will require an
 additional step to load the module later. To make things easier, just
 build the drivers as built-in.
 
 Since we have opted to use the socat tool, the socat utility needs to
-be enabled in guest’s busybox `initrd.cpio.gz`. It can be done during
-the socat built by either setting `BR2_PACKAGE_SOCAT /` in the
-`bkc/kafl/userspace/buildroot.config`, or alternatively in
-`$BKC_ROOT/buildroot-2021.11` use `make menuconfig` navigate to the
-right menu entry, save the config, and then build using `make`.
+be enabled in guest’s busybox :code:`initrd.cpio.gz`. It can be done during
+the socat built by either setting :code:`BR2_PACKAGE_SOCAT /` in the
+:code:`bkc/kafl/userspace/buildroot.config`, or alternatively in
+:code:`$BKC_ROOT/buildroot-2021.11` use :code:`make menuconfig` navigate to the
+right menu entry, save the config, and then build using :code:`make`.
 
 Finally, the following steps will add the correct kAFL userspace
-harness. In `$BKC_ROOT/sharedir`, edit your `init.sh` to include the
+harness. In :code:`$BKC_ROOT/sharedir`, edit your :code:`init.sh` to include the
 following snippet early in the script:
 
 .. code-block:: bash
@@ -1219,10 +1219,10 @@ following snippet early in the script:
 	echo "done"  > $KAFL_CTL/control
 
 Now it should be possible to start up a new _VSOCK_ harness by first,
-start listening on the host using  `socat VSOCK-LISTEN:8089,fork –`,
+start listening on the host using :code:`socat VSOCK-LISTEN:8089,fork –`,
 and then start kAFL (make sure it’s using HARNESS_NONE, as always when
-using userspace harnesses) using `fuzz.sh run linux-guest --debug -p1
---sharedir sharedir/`. You should see the text `“VSOCK fuzzing harness”`
+using userspace harnesses) using :code:`fuzz.sh run linux-guest --debug -p1 --sharedir sharedir/`.
+You should see the text :code:`VSOCK fuzzing harness`
 appear in your kAFL process.
 
 To summarize these steps can be executed to start a _VSOCK_ harness:
@@ -1255,14 +1255,14 @@ It is also likely that in the above-mentioned setup the kAFL fuzzer
 will not make any progress. This is due to the fact that the inputs
 are not stable. This happens due to the fact that an external process
 is part of the fuzzing setup. If you encounter this issue, you might
-need to modify kAFL slightly. In the function `execute()` in
-`$BKC_ROOT/kafl/fuzzer/kafl_fuzzer/worker/worker.py`, when a value is
-assigned to the variable `stable`, make sure to overwrite this with
+need to modify kAFL slightly. In the function :code:`execute()` in
+:code:`$BKC_ROOT/kafl/fuzzer/kafl_fuzzer/worker/worker.py`, when a value is
+assigned to the variable :code:`stable`, make sure to overwrite this with
 True. It is also possible to add a custom command line flag enabling
 this feature to the kAFL settings in
-`$BKC_ROOT/kafl/fuzzer/kafl_fuzzer/common/config.py`.
+:code:`$BKC_ROOT/kafl/fuzzer/kafl_fuzzer/common/config.py`.
 
-The above example for the `virtio-vsock` has demonstrated how to enable
+The above example for the :code:`virtio-vsock` has demonstrated how to enable
 fuzzing in a more complex driver setup scenario using a userspace kAFL
 harness. The end output of the fuzzing step is a set of reproducible
 crashes that a fuzzer finds for the given driver. The crashes needs to

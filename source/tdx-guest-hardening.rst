@@ -1031,9 +1031,9 @@ how the driver registration is done, how to perform functional testing
 for this driver and any higher-level interface abstractions present.
 
 **Example**. For our `virtio-vsock` driver example, the source code of this
-driver is located at `/net/vmw_vsock/virtio_transport.c` and the driver
+driver is located at `/net/vmw_vsock/virtio_transport.c <https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-4/net/vmw_vsock/virtio_transport.c>`_ and the driver
 registers itself on the virtio bus (an abstraction level over the pci bus)
-using `register_virtio_driver()`.
+using `register_virtio_driver() <https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-4/net/vmw_vsock/virtio_transport.c#L754>`_.
 
 Perform code audit
 ------------------
@@ -1290,7 +1290,7 @@ Enable driver in the TDX filter
 When the driver code has been hardened and all
 the patches are integrated and verified, the driver can be enabled in
 the TDX guest by modifying
-the allow list in the TDX driver filter code in `arch/x86/kernel/tdx-filter.c`.
+the allow list in the TDX driver filter code in `arch/x86/kernel/tdx-filter.c <https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-4/arch/x86/kernel/tdx-filter.c>`_.
 
 **Example**. For the virtio-vsock driver the following patch adds it
 to the list of allowed devices on the virtio bus.

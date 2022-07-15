@@ -1142,43 +1142,43 @@ cases and fuzzing can help discover such cases.
 requires some manual work and modifications of the fuzzing setup (as
 opposite to more straightforward examples like :code:`virtio-net` or
 :code:`virtio-console`) and below steps explain how to add support for such a
-target. In a nutshell, :code:`virtio-vsock` sets up a socket on the host or _VMM_,
+target. In a nutshell, :code:`virtio-vsock` sets up a socket on the host or `VMM`,
 allowing a host process to setup a direct socket connection to the
-guest VM over _VirtIO_. For fuzzing, this requires some initial setup in
+guest VM over `VirtIO`. For fuzzing, this requires some initial setup in
 the host, as well as establishing a connection from the guest.
 It is also important to make sure that the targeted device is allowed
 by the device filter when performing the fuzzing. See  
-`Enable driver in the TDX filter`_  below for the instructions. 
+`Enable driver in the TDX filter``  below for the instructions. 
 
-**Host steps**. First, the _VMM_ host kernel must support :code:`VSOCK`. The
+**Host steps**. First, the `VMM` host kernel must support :code:`VSOCK`. The
 corresponding kernel module can be loaded using :code:`modprobe vhost_vsock`.
 If this fails, it might be required to install a
 different kernel which has :code:`CONFIG_VHOST_VSOCK` set. When the
 :code:`vhost_vsock` driver is enabled, a device shall appear at
 :code:`/dev/vhost-vsock`. Its default permissions might be insufficient for
-_QEMU_ to access, but it can be fixed by executing :code:`chmod 0666 /dev/vhost-vsock`.
+`QEMU` to access, but it can be fixed by executing :code:`chmod 0666 /dev/vhost-vsock`.
 Now that the :code:`vhost-vsock` device is available to
-_QEMU_, the device for the guest VM can be enabled by appending the
+`QEMU`, the device for the guest VM can be enabled by appending the
 string :code:`-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=3` to
 QEMU options. The guest-cid value is a connection identifier that
 needs to be unique for the system. In other words, when fuzzing with
-multiple workers, each _QEMU_ instance must use a separate guest-cid.
+multiple workers, each `QEMU` instance must use a separate guest-cid.
 For kAFL we have added some syntax magic to allow for these
 kinds of situations. In your :code:`kafl_config.yaml` (by default found in
 :code:`$BKC_ROOT/bkc/kafl/kafl_config.yaml`),  the following string can be
 appended to the :code:`qemu_base` entry: :code:`-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid={QEMU_ID + 3}`.
-The expression :code:`QEMU_ID + 3`, will evaluate to the _QEMU_ worker instance id
+The expression :code:`QEMU_ID + 3`, will evaluate to the `QEMU` worker instance id
 (which is unique) plus 3. We need to add 3, since the vsock guest cid
-range starts at 3. _CIDs_ 0,1,2 are reserved for the hypervisor,
+range starts at 3. `CIDs` 0,1,2 are reserved for the hypervisor,
 generally reserved, and reserved for the host respectively. Now each
-fuzzing worker instance should get its own unique _CID_, allowing a
+fuzzing worker instance should get its own unique `CID`, allowing a
 connection to be made from the guest to the host. Finally, to be able
 to test vsock and setup connections, the :code:`socat` utility can be used.
 While :code:`socat` can be already installed on your fuzzing system, the socat
 vsock support is a recent addition and it might be required to
 download or build a more recent version of socat to enable this
 functionality. Pre-built binaries and the source code is available at
-`socat project page <http://www.dest-unreach.org/socat/>`_ To test
+`socat project page <http://www.dest-unreach.org/socat/>`` To test
 whether the installed :code:`socat` supports vsock execute: :code:`socat VSOCK-LISTEN:8089,fork`.
 
 To summarize, these are the main steps to be performed on the host:
@@ -1218,14 +1218,14 @@ following snippet early in the script:
 	socat - VSOCK-CONNECT:2:8089
 	echo "done"  > $KAFL_CTL/control
 
-Now it should be possible to start up a new _VSOCK_ harness by first,
+Now it should be possible to start up a new `VSOCK` harness by first,
 start listening on the host using :code:`socat VSOCK-LISTEN:8089,fork –`,
 and then start kAFL (make sure it’s using HARNESS_NONE, as always when
 using userspace harnesses) using :code:`fuzz.sh run linux-guest --debug -p1 --sharedir sharedir/`.
 You should see the text :code:`VSOCK fuzzing harness`
 appear in your kAFL process.
 
-To summarize these steps can be executed to start a _VSOCK_ harness:
+To summarize these steps can be executed to start a `VSOCK` harness:
 
 On the guest:
 

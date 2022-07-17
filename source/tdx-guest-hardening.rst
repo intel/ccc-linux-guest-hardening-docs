@@ -979,7 +979,7 @@ event is signaled via debugfs.
 
 Example harness using a stimulus.elf program:
 
-   .. code-block:: bash
+.. code-block:: bash
 
       #!/bin/bash
       KAFL_CTL=/sys/kernel/debug/kafl
@@ -1000,4 +1000,334 @@ https://github.com/intel/ccc-linux-guest-hardening/tree/master/bkc/kafl/userspac
 More sophisticated “harness” for randomized stimulus execution:
 https://github.com/intel/ccc-linux-guest-hardening/tree/master/bkc/kafl/userspace/sharedir_template/init.sh
 
+Enabling additional kernel drivers
+==================================
 
+The reference TDX guest kernel implementation provided for the `Linux SW stack for
+Intel TDX <https://github.com/intel/tdx-tools>`_ only enables a small set of
+virtio drivers that are essential for the TDX guest basic functionality. These
+drivers have been hardened using the methodology described in this document,
+but naturally different deployment scenarios and use cases for the TDX will
+require many more additional drivers to be enabled in the TDX guest kernel.
+
+This section provides guidance on how to use the methodology presented
+in this document for adding and hardening a new driver for the TDX guest kernel.
+
+In order to explain better on how to perform the below steps, we will
+use virtio-vsock driver as an example. This driver was the last one to
+be enabled and hardened
+for the `Linux SW stack for Intel TDX <https://github.com/intel/tdx-tools>`_.
+Its primary usage in TDX guest kernel is to communicate with the host to
+request converting a local TDX attestation report into a remotely verifiable
+TDX attestation quote.
+
+Identify the device/driver pair
+-------------------------------
+
+The first step includes locating the source code of a target driver in
+the Linux kernel tree, understanding the bus that this driver
+is registered for (typically it would be a pci or acpi bus), as well as
+how the driver registration is done, how to perform functional testing
+for this driver and any higher-level interface abstractions present.
+
+**Example**. For our :code:`virtio-vsock` driver example, the source code of this
+driver is located at `/net/vmw_vsock/virtio_transport.c <https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-4/net/vmw_vsock/virtio_transport.c>`_ and the driver
+registers itself on the virtio bus (an abstraction level over the pci bus)
+using `register_virtio_driver() <https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-4/net/vmw_vsock/virtio_transport.c#L754>`_.
+
+Perform code audit
+------------------
+
+In this step, the source code of the driver
+is manually audited to determine the input points where the untrusted data
+from the host or `VMM` is consumed and how this data is being processed.
+In order to facilitate the manual audit, the :code:`check_host_input` smatch pattern can
+be used to identify these input points. For that, a smatch run can be done on
+an individual driver source file using :code:`kchecker` command.
+
+**Example**. The below command line for :code:`virtio-vsock` driver assumes
+that you have
+a smatch instance with the :code:`check_host_input` pattern installed at
+:code:`~/smatch` folder and the command is invoked from the kernel source tree root.
+For the instructions on how to install smatch please consult
+`README.md <https://github.com/intel/ccc-linux-guest-hardening/blob/master/bkc/audit/README.md>`_
+
+.. code-block:: bash
+
+      ~/smatch_scripts/kchecker net/vmw_vsock/virtio_transport.c > driver_results
+
+The :code:`driver_results` output file will contain the list of input points
+and the limited
+propagation information:
+
+.. code-block:: shell
+
+   net/vmw_vsock/virtio_transport.c:305 virtio_transport_tx_work() error:
+   {8890488479003397221} 'check_host_input' read from the host using function
+   'virtqueue_get_buf' to a non int type local variable 'pkt', type is struct virtio_vsock_pkt*;   
+   net/vmw_vsock/virtio_transport.c:306 virtio_transport_tx_work() error:
+   {5556237559821482352} 'check_host_input' propagating a tainted value from
+   the host 'pkt' into a function 'virtio_transport_free_pkt';
+   net/vmw_vsock/virtio_transport.c:305 virtio_transport_tx_work() warn:
+   {8890488479003397221} 'check_host_input' potential read from the host using
+   function 'virtqueue_get_buf';
+   net/vmw_vsock/virtio_transport.c:375 virtio_vsock_update_guest_cid() error:
+   {7572251756130242} 'check_host_input' propagating a tainted value from
+   the host 'guest_cid' into a function 'get';
+   net/vmw_vsock/virtio_transport.c:377 virtio_vsock_update_guest_cid() error:
+   {16638257021812442297} 'check_host_input' propagating read value from
+   the host 'guest_cid' into a different complex variable 'vsock->guest_cid';
+   net/vmw_vsock/virtio_transport.c:410 virtio_transport_event_work() error:
+   {8890488479003397221} 'check_host_input' read from the host using function
+   'virtqueue_get_buf' to a non int type local variable 'event', type is struct virtio_vsock_event*;
+   net/vmw_vsock/virtio_transport.c:412 virtio_transport_event_work() error:
+   {8840682050757106252} 'check_host_input' propagating a tainted value from
+   the host 'event' into a function 'virtio_vsock_event_handle';
+   net/vmw_vsock/virtio_transport.c:414 virtio_transport_event_work() error:
+   {83481497696856778} 'check_host_input' propagating a tainted value from
+   the host 'event' into a function 'virtio_vsock_event_fill_one';
+   net/vmw_vsock/virtio_transport.c:410 virtio_transport_event_work() warn:
+   {8890488479003397221} 'check_host_input' potential read from the host
+   using function 'virtqueue_get_buf';
+   net/vmw_vsock/virtio_transport.c:541 virtio_transport_rx_work() error:
+   {8890488479003397230} 'check_host_input' read from the host using function
+   'virtqueue_get_buf' to a non int type local variable 'pkt', type is struct virtio_vsock_pkt*;
+   net/vmw_vsock/virtio_transport.c:551 virtio_transport_rx_work() error:
+   {5556237559821482370} 'check_host_input' propagating a tainted value from
+   the host 'pkt' into a function 'virtio_transport_free_pkt';
+   net/vmw_vsock/virtio_transport.c:556 virtio_transport_rx_work() error:
+   {5857033014461230228} 'check_host_input' propagating a tainted value from
+   the host 'pkt' into a function 'virtio_transport_deliver_tap_pkt';
+   net/vmw_vsock/virtio_transport.c:557 virtio_transport_rx_work() error:
+   {8453424129492944817} 'check_host_input' propagating a tainted value from
+   the host 'pkt' into a function 'virtio_transport_recv_pkt';
+
+Given this information the manual code audit can be performed by looking at each
+reported entry in the source code to determine whenever the input consumed
+from host or `VMM` is processed securely. Please consult section `Static Analyzer and Code Audit`_
+for more information on how to interpret each reported entry and how to perform
+manual analysis. The output of this step is a list of entries that are marked
+'concern' that would require patches to be created in order to harden
+the given driver based on the manual code audit step.
+
+Perform driver fuzzing
+----------------------
+
+Ideally each code location reported by the smatch
+in step 2 needs to be exercised by using either `kafl` or `kfx` fuzzers (or both).
+However, if resource or timing is very limited, the fuzzing can be
+primary focused
+only on the 'concern' entries from the step 2 or on any other entries
+that are considered potentially problematic (complex parsing of data, many call
+chains, etc.).
+The typical reported input locations can be divided into two groups:
+driver initialization
+code (init and probe functions) and runtime operation. The first group would be
+the easiest one to reach by a fuzzer since it does not require any
+external stimulus:
+it only requires a creation of a separate fuzzing harness. The second
+one ideally
+requires a functional test suite to be run to exercise the driver
+functionality as a stimulus.
+However, in the absence of such a test suite, a set of simple manual
+tests can be
+created or certain userspace commands/operations performed that trigger
+invocation of the functions reported by smatch in step 2. Setting up
+the driver fuzzing can also be very beneficial even in cases when
+smatch does not report any hits in driver’s init or probe functions,
+because smatch can miss some host input consumption points in some
+cases and fuzzing can help discover such cases.
+
+**Example**. Enabling fuzzing targets like the :code:`virtio-vsock` driver
+requires some manual work and modifications of the fuzzing setup (as
+opposite to more straightforward examples like :code:`virtio-net` or
+:code:`virtio-console`) and below steps explain how to add support for such a
+target. In a nutshell, :code:`virtio-vsock` sets up a socket on the host or `VMM`,
+allowing a host process to setup a direct socket connection to the
+guest VM over `VirtIO`. For fuzzing, this requires some initial setup in
+the host, as well as establishing a connection from the guest.
+It is also important to make sure that the targeted device is allowed
+by the device filter when performing the fuzzing. See  
+`Enable driver in the TDX filter``  below for the instructions. 
+
+**Host steps**. First, the `VMM` host kernel must support :code:`VSOCK`. The
+corresponding kernel module can be loaded using :code:`modprobe vhost_vsock`.
+If this fails, it might be required to install a
+different kernel which has :code:`CONFIG_VHOST_VSOCK` set. When the
+:code:`vhost_vsock` driver is enabled, a device shall appear at
+:code:`/dev/vhost-vsock`. Its default permissions might be insufficient for
+`QEMU` to access, but it can be fixed by executing :code:`chmod 0666 /dev/vhost-vsock`.
+Now that the :code:`vhost-vsock` device is available to
+`QEMU`, the device for the guest VM can be enabled by appending the
+string :code:`-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=3` to
+QEMU options. The guest-cid value is a connection identifier that
+needs to be unique for the system. In other words, when fuzzing with
+multiple workers, each `QEMU` instance must use a separate guest-cid.
+For kAFL we have added some syntax magic to allow for these
+kinds of situations. In your :code:`kafl_config.yaml` (by default found in
+:code:`$BKC_ROOT/bkc/kafl/kafl_config.yaml`),  the following string can be
+appended to the :code:`qemu_base` entry: :code:`-device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid={QEMU_ID + 3}`.
+The expression :code:`QEMU_ID + 3`, will evaluate to the `QEMU` worker instance id
+(which is unique) plus 3. We need to add 3, since the vsock guest cid
+range starts at 3. `CIDs` 0,1,2 are reserved for the hypervisor,
+generally reserved, and reserved for the host respectively. Now each
+fuzzing worker instance should get its own unique `CID`, allowing a
+connection to be made from the guest to the host. Finally, to be able
+to test vsock and setup connections, the :code:`socat` utility can be used.
+While :code:`socat` can be already installed on your fuzzing system, the socat
+vsock support is a recent addition and it might be required to
+download or build a more recent version of socat to enable this
+functionality. Pre-built binaries and the source code is available at
+`socat project page <http://www.dest-unreach.org/socat/>`` To test
+whether the installed :code:`socat` supports vsock execute: :code:`socat VSOCK-LISTEN:8089,fork`.
+
+To summarize, these are the main steps to be performed on the host:
+
+.. code-block:: bash
+
+	modprobe vhost_vsock
+	chmod 0666 /dev/vhost-vsock
+	qemu: -device vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid=3
+
+**Guest steps**. The next step in enabling :code:`virtio-vsock` fuzzing is to
+set up the kAFL userspace fuzzing harness in the following way.
+
+First, the guest kernel needs to be compiled with :code:`vsock` support
+(:code:`CONFIG_VIRTIO_VSOCKET=y` and :code:`CONFIG_VHOST_VSOCK=y`). Alternatively, it
+can be also enabled as a kernel module, but this will require an
+additional step to load the module later. To make things easier, just
+build the drivers as built-in.
+
+Since we have opted to use the socat tool, the socat utility needs to
+be enabled in guest’s busybox :code:`initrd.cpio.gz`. It can be done during
+the socat built by either setting :code:`BR2_PACKAGE_SOCAT /` in the
+:code:`bkc/kafl/userspace/buildroot.config`, or alternatively in
+:code:`$BKC_ROOT/buildroot-2021.11` use :code:`make menuconfig` navigate to the
+right menu entry, save the config, and then build using :code:`make`.
+
+Finally, the following steps will add the correct kAFL userspace
+harness. In :code:`$BKC_ROOT/sharedir`, edit your :code:`init.sh` to include the
+following snippet early in the script:
+
+.. code-block:: bash
+
+	mount -t debugfs none /sys/kernel/debug/
+	KAFL_CTL=/sys/kernel/debug/kafl
+	echo “VSOCK fuzzing harness” | hcat
+	echo "start"  > $KAFL_CTL/control
+	socat - VSOCK-CONNECT:2:8089
+	echo "done"  > $KAFL_CTL/control
+
+Now it should be possible to start up a new `VSOCK` harness by first,
+start listening on the host using :code:`socat VSOCK-LISTEN:8089,fork –`,
+and then start kAFL (make sure it’s using HARNESS_NONE, as always when
+using userspace harnesses) using :code:`fuzz.sh run linux-guest --debug -p1 --sharedir sharedir/`.
+You should see the text :code:`VSOCK fuzzing harness`
+appear in your kAFL process.
+
+To summarize these steps can be executed to start a `VSOCK` harness:
+
+On the guest:
+
+.. code-block:: bash
+
+	socat VSOCK-LISTEN:8089,fork –
+
+On the host:
+
+.. code-block:: bash
+
+	socat - vsock-accept:3:8089
+
+On the guest:
+
+.. code-block:: bash
+
+	socat - VSOCK-CONNECT:2:8089
+
+On the host:
+
+.. code-block:: bash
+
+	socat VSOCK-LISTEN:8089,fork –
+
+It is also likely that in the above-mentioned setup the kAFL fuzzer
+will not make any progress. This is due to the fact that the inputs
+are not stable. This happens due to the fact that an external process
+is part of the fuzzing setup. If you encounter this issue, you might
+need to modify kAFL slightly. In the function :code:`execute()` in
+:code:`$BKC_ROOT/kafl/fuzzer/kafl_fuzzer/worker/worker.py`, when a value is
+assigned to the variable :code:`stable`, make sure to overwrite this with
+True. It is also possible to add a custom command line flag enabling
+this feature to the kAFL settings in
+:code:`$BKC_ROOT/kafl/fuzzer/kafl_fuzzer/common/config.py`.
+
+The above example for the :code:`virtio-vsock` has demonstrated how to enable
+fuzzing in a more complex driver setup scenario using a userspace kAFL
+harness. The end output of the fuzzing step is a set of reproducible
+crashes that a fuzzer finds for the given driver. The crashes needs to
+be investigated and the ones that are determined to be real security
+issues need to be fixed in the code.
+
+Perform code fixes
+------------------
+
+Based on the above steps 2 and 3, a set of hardening patches
+need to be created to fix the identified issues. We strongly encourage to submit
+any such hardening patches to the mainline Linux kernel to ensure
+everyone benefits
+the joint hardened kernel, as well to get suggestions on the most
+appropriate way of
+fixing these issues. Also in order to verify that the issues have been
+addressed by
+respective patches, a new round of fuzzing needs to be performed to
+verify that the
+issues found in step 3 are not reproducible anymore.
+
+Enable driver in the TDX filter
+-------------------------------
+
+When the driver code has been hardened and all
+the patches are integrated and verified, the driver can be enabled in
+the TDX guest by modifying
+the allow list in the TDX driver filter code in `arch/x86/kernel/tdx-filter.c <https://github.com/IntelLabs/kafl.linux/blob/kafl/fuzz-5.15-4/arch/x86/kernel/tdx-filter.c>`_.
+
+**Example**. For the virtio-vsock driver the following patch adds it
+to the list of allowed devices on the virtio bus.
+
+.. code-block:: diff
+
+	Vsock driver has been audited, add it to the allow list in the TDX device
+	filter.
+
+	Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+	---
+	arch/x86/kernel/tdx-filter.c    | 1 +
+	include/uapi/linux/virtio_ids.h | 1 +
+	2 files changed, 2 insertions(+)
+
+	diff --git a/arch/x86/kernel/tdx-filter.c b/arch/x86/kernel/tdx-filter.c
+	index 47fda826aec4..fd759680bd2a 100644
+	--- a/arch/x86/kernel/tdx-filter.c
+	+++ b/arch/x86/kernel/tdx-filter.c
+	@@ -64,6 +64,7 @@ struct pci_device_id pci_allow_ids[] = {
+	  { PCI_DEVICE(PCI_VENDOR_ID_REDHAT_QUMRANET, VIRTIO1_ID_BLOCK) },
+	  { PCI_DEVICE(PCI_VENDOR_ID_REDHAT_QUMRANET, VIRTIO1_ID_CONSOLE) },
+	  { PCI_DEVICE(PCI_VENDOR_ID_REDHAT_QUMRANET, VIRTIO1_ID_9P) },
+	+ { PCI_DEVICE(PCI_VENDOR_ID_REDHAT_QUMRANET, VIRTIO1_ID_VSOCK) },
+	  { 0, },
+	};
+
+	diff --git a/include/uapi/linux/virtio_ids.h b/include/uapi/linux/virtio_ids.h
+	index a2fcb4681028..f592efd82450 100644
+	--- a/include/uapi/linux/virtio_ids.h
+	+++ b/include/uapi/linux/virtio_ids.h
+	@@ -88,5 +88,6 @@
+	#define VIRTIO1_ID_BLOCK 0x1042 /* transitional virtio block */
+	#define VIRTIO1_ID_CONSOLE 0x1043 /* transitional virtio console */
+	#define VIRTIO1_ID_9P 0x1049 /* transitional virtio 9p console */
+	+ #define VIRTIO1_ID_VSOCK 0x1053 /* transitional virtio vsock transport */
+
+	#endif /* _LINUX_VIRTIO_IDS_H */
+	--
+	2.25.1

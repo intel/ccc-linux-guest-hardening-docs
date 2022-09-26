@@ -554,12 +554,12 @@ TDX emulation setup
 ===================
 
 Running a fully functional TDX guest requires CPU and HW support that is only
-available starting from Intel Sapphire Rapids (SPR) CPUs. On contrary, our TDX
-emulation setup allows testing SW running inside TDX guest VM early on and independent of the
-actual SPR HW availability. It can be run on any recent and commonly available Intel
-platforms without any special HW features. However it is important to note that
+available on future Intel Xeon platforms. On contrary, our TDX
+emulation setup allows testing SW running inside TDX guest VM early on ahead of
+HW availability. It can be run on any recent and commonly available Intel
+platforms without any special HW features. However, it is important to note that
 this emulation setup is very limited in the amount of features it supports
-and absolutely unsecure: emulated TDX guest runs under full control of the host
+and is not secure: emulated TDX guest runs under full control of the host
 and VMM.
 
 The main challenge for the setup is the emulation of the Intel TDX module.

@@ -1,6 +1,6 @@
 .. _tdx-guest-hardening:
 
-Intel® Trust Domain Extension Guest Linux\* Kernel Hardening Strategy
+Intel® Trust Domain Extension Guest Linux Kernel Hardening Strategy
 #####################################################################
 
 Contributors:

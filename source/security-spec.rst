@@ -1,6 +1,6 @@
 .. _security-spec:
 
-Intel® Trust Domain Extension Linux\* Guest Kernel Security Specification
+Intel® Trust Domain Extension Linux Guest Kernel Security Specification
 #########################################################################
 
 Contributors:

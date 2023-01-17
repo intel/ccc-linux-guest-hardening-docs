@@ -640,12 +640,17 @@ guest kernel needs to make sure that an already accepted page is not
 accepted again, because doing so would change the content of the guest
 private page to a zero page with possible security implications (zeroing
 out keys, secrets, etc.). Additionally, per current design of the TDX
-module (and given that a TD guest opts-in for such notifications), certain events
-(like TDX guest memory access to a non-accepted page) can result in a #VE
-inserted by the TDX guest module. Please see section 16.3.3 in
-`Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_ for more details. For the Linux kernel
-is very important that such #VE notifications do not happen during certain TDX
-guest critical code paths (see `Safety against #VE in kernel code`_ for more details).
+module, certain events (like TDX guest memory access to a non-accepted page)
+can result in a #VE event inserted by the TDX guest module. Please see section 16.3.3 in
+`Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_ for more details.
+The guest kernel must always check the cause of a #VE event and panic if
+it sees a #VE event that is caused by access to a TDX guest private page.
+If this check is not implemented, it opens a TDX guest to many attacks against
+the content of the TDX guest private memory. 
+For the Linux guest kernel specifically, it is also very important that such #VE notifications do
+not happen during certain TDX guest critical code paths. The section `Safety against #VE in kernel code`_ 
+provides more details, as well as describes how Linux guest kernel avoids
+#VE events altogether.
 
 TDVF conversion
 ---------------
@@ -686,7 +691,7 @@ accepts 2MB chunks as needed.
 Safety against #VE in kernel code
 ---------------------------------
 
-The kernel needs to make sure it does not get #VE in certain critical
+The TDX guest Linux kernel needs to make sure it does not get #VE in certain critical
 sections. One example of such a section is a system call gap: on
 SYSCALL/SYSRET. There is a small instruction window where the kernel
 runs with the user stack pointer. If a #VE event (for example due to a
@@ -702,11 +707,12 @@ Such #VE events are currently possible in two cases:
 2. TDX module can raise a #VE as a notification mechanism when it detects excessive Secure EPT violations raised by the same TD instruction (zero-step attack is detected by TDX module). This is only done if bit 0 of TDCS.NOTIFY\_ENABLES field is set. 
 
 To ensure the above situations do not occur, the TD Linux guest kernel
-requires that ATTRIBUTES.SEPT\_VE\_DISABLE is set, and that bit 0 of
-TDCS.NOTIFY\_ENABLES is not set. These values are checked during TD guest
-initialization.
+performs the following during kernel initialization:
 
-Although this disables TDX module notifications for excessive numbers
+1. Checks that ATTRIBUTES.SEPT\_VE\_DISABLE is set and panic otherwise.
+2. Forcefully clear the TDCS.NOTIFY\_ENABLES bit 0 regardless of its state. 
+
+Although the later check disables TDX module notifications for excessive numbers
 of Secure EPT violations, the basic defenses against zero-stepping
 provided by the TDX module are still in effect.
 For more details please see section 16.3 in

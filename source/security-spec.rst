@@ -578,6 +578,15 @@ forcing the X86\_FEATURE\_TSC\_RELIABLE bit) to avoid the possible
 fallback to jiffy time, which could be influenced by the host by
 changing the frequency of the timer interrupts.
 
+The TSC deadline timer inside the TDX guest is not secure and fully under
+the control of host/VMM. The TSC deadline feature enumeration (CPUID(1).ECX[24])
+inside the TDX guest reports the platform native value, but the TDX guest kernel
+reads or writes to MSR_IA32_TSC_DEADLINE will result in a #VE
+inserted to the guest and in a subsequent TDVMCALL to VMM. On such a call the VMM starts
+an LAPIC timer to emulate tsc deadline timer and inject a posted interrupt
+to the TDX guest when the timer expires.
+
+
 Declaring insecurity to user space
 ==================================
 

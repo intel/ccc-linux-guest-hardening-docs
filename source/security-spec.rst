@@ -613,17 +613,30 @@ BIOS-supplied ACPI tables and mappings
 ======================================
 
 ACPI table mappings and similar table mappings use the ioremap\_cache
-interface, which is never set to shared with the untrusted host/VMM.
+interface, which is never set to 'shared' with the untrusted host/VMM.
+However, in order to be able to share operating regions declared in
+ACPI tables a new interface ioremap\_cache\_shared is introduced. This
+interface sets the pages to shared and is currently only used by the
+acpi system memory address space handler (acpi\_ex\_system\_memory\_space\_handler).
+Note that this means that any operating region declared in the allow
+list of TDX guest kernel ACPI tables is going to be set to 'shared' automatically.
+This further motivates keeping the allowed ACPI table list in TDX guest
+to a minimum required amount, and auditing the content of the allowed
+tables. Ideally it would be more secure to only share operating regions
+of drivers authorized by the device filter. However, since ACPI core doesn't
+have a mapping between operating region addresses and the drivers that requested it,
+this change has been proven to be too intrusive. 
 
 ACPI tables are (mostly) controlled by the host and only passed through
 the TDVF (see `TDX guest virtual firmware <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.01.pdf>`_ for more information).
-They should be attested and therefore trusted. However, we
+They are measured into TDX attestation registers, and therefore can be
+remotely attested and therefore can be considered trusted. However, we
 cannot expect that an attesting entity fully understands what causes the
 Linux kernel to open security holes based on some particular AML. Then a
 malicious hypervisor might be able to attack the guest based on attack
 surfaces exposed by the non-malicious and attested ACPI tables. The main
 concern here is the tables and methods that configure some functionality
-in the kernel,such as initializing drivers.
+in the kernel, such as initializing drivers.
 
 As a first step to minimize the above attack surface, the TDX guest
 kernel defines an allow list for the ACPI tables. Currently the list

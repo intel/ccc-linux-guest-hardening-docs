@@ -71,6 +71,79 @@ vector that is not covered by this threat model is abusing the Linux
 kernel printout and debug routines that can now take parameters directly
 from the untrusted host/VMM.
 
+The overall threat mitigation matrix is shown in Table below.
+
+.. list-table:: TDX guest Linux kernel threat mitigation matrix
+   :widths: auto
+   :align: center
+   :header-rows: 1
+
+   * - Threat name
+     - Threat description
+     - Mitigation mechanisms
+     - Links to detailed description
+   * - (NRDD) Non-robust device drivers 
+     - Malicious input (MSR, CPUID, PCI config space, PortIO, MMIO, SharedMemory/DMA, KVM Hypercalls) is consumed from the host/VMM by a non-harden device driver that results in a host/VMM -> guest kernel privilege escalation
+     - 1. Disable most of the drivers with the driver filter. Limitation: does not prevent driver __init function from executing.  Some drivers might use legacy registration and avoid filtering. 
+       2. Disable ACPI drivers by limiting a set of allowed ACPI tables (this typically also results in __init function not run beyond first ACPI table presence check)
+       3. Perform hardening of enabled drivers
+     - 1. See `Device filter mechanism`_
+       2. See `BIOS-supplied ACPI tables and mappings`_ 
+       3. See :ref:`tdx-guest-hardening`
+   * - (NRDDI/L) Non-robust device driver’s __init function or legacy non-robust driver
+     - The device filter does not prevent driver initialization function from executing. For 5.15 kernel there are 198 unique __init functions with 5198 unique code locations that can consume a malicious input
+       (MSR,CPUID, PCI config space, PortIO, MMIO, KVM hypercalls) from host/VMM that can result in a host/VMM -> guest kernel privilege escalation.
+     - 1. For PCI config space: pci config space access restrictions
+       2. For MMIO: opt-in MMIO sharing 
+       3. For Port IO: PortIO filter
+       4. For KVM hypercalls: restrict to a minimal allowed set
+       5. For MSRs: TDX module limits host-provided MSRs + code audit
+       6. For CPUIDs: only allow SW range 0x40000000 - 0x400000FF
+     - 1. See `PCI config space`_ 
+       2. See `MMIO`_
+       3. See `IO ports`_
+       4. See `KVM Hypercalls`_
+       5. See `MSRs`_
+       6. See `CPUID`_
+   * - (NRCKC) Non-robust core kernel code
+     - Malicious input (MSR,CPUID, PCI config space, PortIO, MMIO, SharedMemory/DMA, KVM Hypercalls) is consumed from the host/VMM by a core Linux code that results in a host/VMM -> guest kernel privilege escalation
+     - 1. Disable complex features that are not required for TDX guest kernel and can consume input from VMM/host. Limitation: disabling of some features is not straightforward.
+       2. As a defense in depth rely on mitigations from (NRDDI/L) to minimize the open attack surface (especially for MMIO, PortIO, CPUIDs and MSRs).  
+       3. Perform hardening of enabled code
+     - 1. See tbd
+       2. See links from NRDDI/L
+       3. See :ref:`tdx-guest-hardening`
+   * - (HCSG) Host/VMM controlled Spectre v1 gadget
+     - Host/VMM uses a spectre v1 gadget conditioned on the host/VMM controlled input (MSR,CPUID, PCI config space, PortIO, MMIO, SharedMemory/DMA, KVM Hypercalls) and uses that to break confidentiality of the guest VM
+     - 1. Minimize the attack surface by using mitigations from threats (NRDD), (NRDDI/L) and (NRCKC) 
+       2. Perform a static code audit of the remaining surface to identify the potential gadgets and fix them
+     - 1. See links from NRDD, NRDDI/L and NRCKC
+       2. See `Transient Execution attacks and their mitigation`_
+   * - (NRAA) Non-robust AML interpreter or ACPI code
+     - Malicious input is consumed from the host/VMM via an ACPI table (provided by the host/VMM via TDVF virtual FW) that results in a host/VMM -> guest kernel  privilege escalation
+     - 1. ACPI tables are measured to TDX attestation registers, and their measurements included as part of remote attestations. Limitation: Even benign looking ACPI table can
+          exploit some unknown bug in AML interpreter or ACPI code. There are 55+ ACPI tables, some containing a lot of functionality/code.
+       2. Disable most of non-needed ACPI tables via ACPI filter
+     - 1. TDX guest virtual FW (TDVF) enforces it. See `TDX guest virtual firmware <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-virtual-firmware-design-guide-rev-1.01.pdf>`_ 
+       2. See `BIOS-supplied ACPI tables and mappings`_ 
+   * - (HCR) Host/VMM controlled randomness
+     - Host/VMM can observe or affect the state of Linux RNG guest kernel (due to interrupts being the main default source of entropy) and break cryptographic security of all guest mechanisms consuming RNG output
+     - Enforce addition of entropy using RDRAND/RDSEED and avoid fallbacks to insecure jiffies
+     - See `Randomness inside TDX guest`_ 
+   * - (HCT) Host/VMM controlled time
+     - Host/VMM can modify/affect the time visible inside TDX guest and break security of all guest mechanisms depending on a secure time (rollback prevention, etc.)
+     - Disable all mechanisms for the host/VMM to affect guest time. Only rely on TSC timer, which is guaranteed by TDX module
+     - See `TSC and other timers`_ 
+   * - (II) Injected interrupts
+     - Host/VMM can inject an interrupt into the guest with malicious inputs
+     - Injecting interrupts (via posted-interrupt mechanism) is not allowed for exception vectors 0-30. NMI injection is possible with the assistance of TDX module
+     - See `Interrupt handling and APIC`_ 
+   * - (LIPC/P) Lost IPIs/reliable panic
+     - Host/VMM can drop IPIs between vcpus on the guest and as a result attempt to cause some unexpected behavior in guest
+     - Code audit on consequences of lost IPIs (no findings so far). Panic seems to be safe.  
+     - N/A
+
+
 TDX Linux guest kernel overall hardening methodology
 ====================================================
 
@@ -81,6 +154,8 @@ kernel subsystems that are relevant to the described threat model and provides
 details on their hardening principles. The overall security principle is
 that in case of any corruption event, the safest default option is to
 raise the kernel panic.
+
+.. _sec-device-filter:
 
 Device filter mechanism
 =======================
@@ -184,6 +259,8 @@ User MMIO
 In the current Linux implementation user MMIO is not supported
 and results in SIGSEGV. Therefore, it cannot be used to attack
 the kernel (other than DoS).
+
+.. _sec-APIC:
 
 Interrupt handling and APIC
 ---------------------------
@@ -573,6 +650,8 @@ IOMMU is disabled for the TDX guest due to the DMAR ACPI table not being
 included in the list of allowed ACPI tables for the TDX guest. Similar
 for the AMD IOMMU. The other IOMMU drivers should not be active on x86.
 
+ .. _sec-randomness:
+
 Randomness inside TDX guest
 ===========================
 
@@ -603,6 +682,8 @@ CONFIG\_RANDOM\_TRUST\_CPU inside a TDX guest. As a side effect, the
 resulting entropy counts for blocking pool (/dev/random) can be
 incorrect, but it is assumed that nowadays people use Cha-Cha20 DRNG
 (/dev/urandom) for cryptographically secure values.
+
+ .. _sec-time:
 
 TSC and other timers
 =====================
@@ -933,6 +1014,8 @@ virtio\_to\_cpu macros and their higher-level wrappers, which are also
 used for auditing and injecting the fuzzing input. However, there still
 can be other accesses to the shared memory that must be manually audited
 and instrumented for fuzzing.
+
+.. _sec-spectre_v1:
 
 Transient Execution attacks and their mitigation
 ================================================

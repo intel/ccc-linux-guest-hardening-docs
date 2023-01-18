@@ -82,6 +82,49 @@ details on their hardening principles. The overall security principle is
 that in case of any corruption event, the safest default option is to
 raise the kernel panic.
 
+Device filter mechanism
+=======================
+
+As stated above, the primary goal of the security architecture described
+in this document is to help protecting the TDX Linux guest kernel from hypervisor
+attacks through TDVMCALL or shared memory communication interfaces. 
+The detailed description of when these interfaces are used in TDX guest kernel
+can be found below in the section `TDVMCALL-hypercall-based communication interfaces`_,
+but our analysis of the kernel code has shown that the biggest users of such
+interfaces are device drivers (more than 95%). Every time a driver
+performs a port IO or MMIO read, access a pci config space or reads values
+from MSRs or CPUIDs, there is a possibility for a malicious hypervisor to
+inject a malformed value.
+
+Fortunately, only a small subset of device drivers are required for the TDX guest
+operation (for Linux TDX SW reference stack it is a subset of virtio drivers
+described in `VirtIO and shared memory`_), so most of the attack surface can
+be disabled by creating a small list of allowed device drivers. This is the
+main goal of the guest runtime device filter. It allows to define an allow or
+deny list for device drivers and prevents non-authorized device driver's
+probe functions from running (note: driver's init functions are able to execute).
+It also automatically sets to 'shared' the MSI mailboxes and MMIO mappings of the
+authorized device drivers, if the latter ones are created using pci\_iomap\_* or devm\_ioremap*
+interfaces. For MMIO mappings created using plain ioremap\_* style interface,
+a driver code needs to be modified to either use the above mentioned pci\_iomap\_*/devm\_ioremap*
+interfaces or a new ioremap\_driver\_hardened interface that manually sets the
+mapping to 'shared' also. 
+
+Additionally when device filter is enabled (see section `Kernel command line`_
+on how it can be disabled for debug purpose from the command line), there are
+other security mechanisms that are enabled for the TDX guest Linux
+kernel, namely Port IO filter is active (see section `IO ports`_ for details),
+ACPI table allow list is enforced (see section `BIOS-supplied ACPI tables and mappings`_ 
+for details) and pci config space access from non-authorized device drivers is limited
+(see section `PCI config space`_ for details).
+If disabling of the device filter or associated mechanisms is
+desired for debug purpose, please consult section `Kernel command line`_ on how
+to change configuration of these mechanisms using command line, i.e. modify
+allow/deny list of the device filter, modify the list of allowed ACPI tables, etc.
+
+
+.. _sec-tdvmcall-interfaces:
+
 TDVMCALL-hypercall-based communication interfaces
 =================================================
 
@@ -103,6 +146,9 @@ instruction decoder) and converts it into a TDVMCALL or rejects it
 require an in-depth security audit or fuzzing since it is not the actual
 consumer of the host/VMM supplied untrusted data. However, it does
 implement a simple allow list for the port IO filtering (see `IO ports`_ ).
+
+
+.. _sec-mmio:
 
 MMIO
 ----
@@ -168,14 +214,15 @@ to make sure all missing IPIs result in panics or stop the operation (in
 case the timeout is controlled by the host). This should be already
 handled by the normal timeout in smp\_call\_function\*().
 
+.. _sec-pci-config-space:
 
 PCI config space
 ----------------
 
 The host controls the PCI config space, so in general, any PCI config
-space reads are untrusted. Apart from hardening the generic PCI code, we
-plan to have a special config space filter that prevents random
-initcalls from accessing the PCI config space of unauthorized devices
+space reads are untrusted. Apart from hardening the generic PCI code, there
+is a special pci config space filter that prevents random initcalls from
+accessing the PCI config space of unauthorized devices
 not allowed by the device filter. The config space filter is implemented
 by setting unauthorized devices to the “errored” state, which prevents
 any config space accesses.
@@ -185,14 +232,11 @@ Inside Linux, the PCI config space is used by several entities:
 PCI subsystem for probing drivers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The PCI subsystem enumerates all PCI devices through config space. The
-host owns the config space, which is untrusted. We’ll only support
-probing through CF8 and disable MCFG config space in the ACPI filtering.
-This implies that only the first 256 bytes are supported for now. We
-have an explicit PCI device ID-based allow list of allowed drivers. All
-these drivers will need to be hardened and fuzzed. This can be
-overridden by a command line option; in this case the system might be
-insecure.
+The PCI subsystem enumerates all PCI devices through PCI config space. The
+host owns the config space, which is untrusted. We only support
+probing through CF8 and disable MCFG config space via the ACPI table allow list.
+This implies that only the first 256 bytes are supported for now. The core PCI
+subsystem code has been hardened via code audit and fuzzing described in :ref:`tdx-guest-hardening`.
 
 Allocating resources
 ~~~~~~~~~~~~~~~~~~~~
@@ -205,35 +249,36 @@ the code in the core pci subsystem, as well as enabled virtio drivers
 have been audited and fuzzed using the techniques described in :ref:`tdx-guest-hardening`.
 Specifically, we paid attention to make sure that the allocated resource
 regions do not overlap with each other or with the rest of the TD guest
-memory. The pci bridge support is planned to be disabled for the TDX
-guest kernel.
+memory.
 
 Drivers
 ~~~~~~~
 
-All allow-listed drivers need to be audited and fuzzed for all
-interactions (port IO, MMIO, and shared memory) they have with the host.
-Initially this will be only a very small list in virtio and VMBus (see
-`VirtIO and shared memory`_).
+All allow-listed drivers need to be audited and fuzzed for all pci config space
+interactions they have with the host. Initially this is only a very small list
+of virtio devices (see `VirtIO and shared memory`_).
 
-User programs accessing PCI devices through sysfs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+User programs accessing PCI config space
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 User programs can access PCI devices directly through sysfs or /dev/mem.
 This could be an attack vector if the user program has an exploitable
-hole in parsing config space or MMIO. If the user programs are using the
+hole in parsing PCI config space or MMIO. If the user programs are using the
 Linux-supplied PCI enumeration (/sys/bus/pci), the PCI device allow list
 will protect user programs to some degree. But it won’t protect programs
 that try to directly access devices that are on the allow list (like
-virtio or VMBus).
+virtio devices).
 
-Both MMIO and port IO access from the userspace is disallowed and
-results in SIGSEGV.
-
-It’s also possible, in principle, for programs to enumerate PCI directly
-through MMIO or CF8 port IO, which would circumvent the allow list.
-Subsequent sections explain how to filter those in the #VE handler
-(see `MSRs`_ and `IO Ports`_ )
+It’s also possible, for userspace programs to access the PCI config space directly
+through CF8 port IO using operm/iopl() or direct read() on /dev/port. The former
+case will be filtered in the TDX guest kernel #VE handler, because the handler does not
+forward port IO requests to an untrusted VMM if the request came from a userspace.
+The latter case (direct read on /dev/port) however is not going to be limited by
+the #VE handler and a userspace program that performs this operation should be
+prepared to handle untrusted input from a VMM securely. PCI config space access
+through MMIO for userspace programs is not possible inside TDX guest since PCIe MCFG
+config space is disabled for TDX guest and normal PCI config space is not mapped to
+MMIO address space.
 
 .. _sec-msrs:
 
@@ -771,6 +816,8 @@ booted through the Linux UEFI stub. Before booting the TDVF runs hashes
 over the kernel image/initrd/startup script and attest those to a key
 server through the TDX measurement registers.
 
+.. _sec-kernel-cmd:
+
 Kernel command line
 ===================
 
@@ -835,6 +882,9 @@ LUKS but some other encrypted storage format. Alternatively, they could
 also not use local storage and rely on a volume mounted from the network
 after attesting themselves to the network server. However, support for
 such remote storage is out of the scope for this document for now.
+
+
+.. _sec-virtio:
 
 VirtIO and shared memory
 ========================

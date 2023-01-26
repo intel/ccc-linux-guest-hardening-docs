@@ -103,7 +103,7 @@ Attack surface minimization
 The main objective for this task is to disable as much code as possible
 from the TD guest kernel to limit the number of interfaces exposed to
 the malicious host/VMM. This is achieved by either explicitly disabling
-certain unneeded features (for example early PCI code) , by a generic
+certain unneeded features (for example early PCI code), by a generic
 filtering approach, such as port IO filtering, driver filtering, etc or
 by restricting access to the MMIO and PCI config space regions
 
@@ -262,30 +262,41 @@ already has a big set of existing patterns that have been used to find
 many security issues with the current mainline kernel.
 
 To identify the locations where a TD guest kernel can take an untrusted
-input from the host/VMM, a custom Smatch pattern check\_host\_input has
-been written. It operates based on a list of “host input functions”. The list
-contains known, low-level functions that perform MSR, port IO, and MMIO
+input from the host/VMM, a custom Smatch pattern 
+`check_host_input <https://repo.or.cz/smatch.git/blob/HEAD:/check_host_input.c>`_ 
+has been written.
+It operates based on a list of base “input functions” (contained
+in `smatch_kernel_host_data <https://repo.or.cz/smatch.git/blob/HEAD:/smatch_kernel_host_data.c>`_),
+i.e. low-level
+functions that perform MSR, port IO, and MMIO
 reads, such as native\_read\_msr, inb/w/l, readb/w/l, as well as
 higher-level wrappers specific to certain subsystems. For example, PCI
 config space uses many wrappers like pci\_read\_config,
 pci\_bus/user\_read\_\* through its code paths to read the information
-from the untrusted host/VMM. The output of the check\_host\_input
-pattern when run against the whole kernel tree is a list of findings
-with exact code locations and some additional information to assist the
-manual code audit process.
+from the untrusted host/VMM. Whenever a function listed in 
+`smatch_kernel_host_data <https://repo.or.cz/smatch.git/blob/HEAD:/smatch_kernel_host_data.c>`_
+is detected in the code, the correct parameters (containing an input that
+could have been supplied by the host) are marked as 'host_data' and
+Smatch's taint analysis will perform propagation of this data through
+the whole kernel codebase. The output of the check\_host\_input
+pattern when run against the whole kernel tree is a list of all locations
+in kernel where the 'host_data' is being processed, with exact code locations
+and some additional information to assist the manual code audit process.
+
+Additionally existing smatch patterns can take a benefit from the fact
+that 'host_data' is now correctly tracked. For example, a modified
+`check_spectre <https://repo.or.cz/smatch.git/blob/HEAD:/check_spectre.c>`_ 
+Smatch pattern now is able to detect spectre v1 gadgets not only on the
+userspace <->kernel surface, but also host <->guest surface. More
+information can be found in `Transient Execution attacks and their mitigation <https://intel.github.io/ccc-linux-guest-hardening-docs/security-spec.html#transient-execution-attacks-and-their-mitigation>`_
 
 The current approach using the check\_host\_input Smatch pattern has
 several limitations. The main limitation is the importance of having a
 correct list of input functions since the pattern will not detect the
 invocations of functions not present in this list. Fortunately, the
-low-level functions for performing MSR, port IO, and MMIO read
-operations are well defined in the Linux kernel. The higher-level
-wrappers can be identified by using an iterative approach: run the
-check\_host\_input Smatch pattern to find all invocations of the
-low-level functions. By looking at these invocations, you can determine
-the next level wrappers, add them to the input function list, and re-run
-the Smatch pattern again. Another limitation of this approach is the
-inability to detect generic DMA-style memory accesses, since they
+low-level base functions for performing MSR, port IO, and MMIO read
+operations are well-defined in the Linux kernel. Another limitation of
+this approach is the inability to detect generic DMA-style memory accesses, since they
 typically do not use any specific functions or wrappers to receive the
 data from the host/VMM. An exception here is a virtIO ring subsystem
 that uses virtio16/32/64\_to\_cpu wrappers in most of the places to
@@ -339,24 +350,6 @@ pci\_swizzle\_interrupt\_pin functions, as well as to several
 \_dev\_info/warn functions. The relevant code snippet with highlighted
 markings is shown in Figure 3.
 
-The check\_host\_input Smatch pattern attempts to to provide a rough
-indication of severity for each finding via “warn” or “error” keywords
-highlighted in grey in Figure 2. Whenever a host input is being used as
-a condition for iteration, assigned to an external variable, returned by
-function, or being passed as an argument to a different generic
-function, the pattern reports such cases as “error” conditions. However,
-if the host input is being passed to a “safe output function” like
-various debug output, MSR, port IO, or MMIO write functions, the pattern
-reports such cases as “warn” conditions. Similarly, “warn” status is
-given to the cases when a function to obtain the host input is invoked,
-but its result is either not stored at all or used in a boolean
-expression to select one of the following code paths. The underlying
-idea behind the severity status is an attempt to assist the manual code
-audit process to indicate the code locations where the possibility of
-finding a security issue is higher. However, in its current form, it is
-strongly recommended to check both “warn” and “error” findings to make
-sure every single code path is secure.
-
 .. figure:: images/code-snipped-pirq.png
    :width: 6.14865in
    :height: 5.68750in
@@ -368,16 +361,32 @@ Figure 3. Code snippet for the pirq\_enable\_irq function.
 Performing a manual code audit
 ------------------------------
 
-When a manual code audit activity is performed, the list of Smatch
-findings is first filtered using the process\_smatch\_output.py python
+The check\_host\_input Smatch pattern can be run as any other existing
+smatch patterns following instructions in `Smatch documentation <https://repo.or.cz/smatch.git/blob/HEAD:/Documentation/smatch.txt>`_ .
+One important precondition before running the pattern is to build the smatch cross
+function database first (at least 5-6 times) in order to make sure that
+the database contains the propagated taint data. The database pre-build step needs
+to happen only once per kernel tree and is not needed in the subsequent
+analysis runs. Also, since the pattern is automatically disabled in the smatch
+default configuration (due to a significant volume output), it must be explicitly 
+enabled in the `smatch header file <https://repo.or.cz/smatch.git/blob/HEAD:/check_list.h#l232>`_ 
+before performing an audit run.
+
+The `ccc-linux-guest-hardening repository <https://github.com/intel/ccc-linux-guest-hardening/blob/master/docs/generate_smatch_audit_list.md>`_ 
+contains instructions on how to obtain the output of check\_host\_input smatch pattern
+using automated scripts provided with the repository.
+Internally, when a manual code audit activity is performed, the list of overall
+findings is filtered using the process\_smatch\_output.py python
 script to discard the results for the areas that are disabled within the
 TD guest kernel. For example, most of the drivers/\* and sound/\*
 results are filtered out except for the drivers that are enabled in the
-TD guest kernel.
+TD guest kernel. Additionally, process\_smatch\_output.py also discards
+findings from other enabled by default smatch patterns. 
 
-Next, the reduced list of Smatch pattern findings can be analyzed
+After following instructions in `ccc-linux-guest-hardening repository <https://github.com/intel/ccc-linux-guest-hardening/blob/master/docs/generate_smatch_audit_list.md>`_ the reduced list of smatch
+pattern findings, smatch\_warns.txt, can be analyzed
 manually by looking at each reported code location and verifying that
-the consumed host input is used in a secure way.
+the consumed or propagated host input is used in a secure way.
 
 Each finding is therefore manually classified into one of the following
 statuses:
@@ -401,7 +410,7 @@ statuses:
      - This code location is reachable inside TDX guest (i.e. not excluded), but
        has not been manually audited yet. 
    * - wrapper
-     - The function that consumed a host input is a higher-level wrapper. The
+     - The function that consumes or propagates a host input is a higher-level wrapper. The
        function is being checked for processing the host input in a secure way,
        but additionally all its callers are also reported by the Smatch pattern
        and the code audit happens on each caller.
@@ -411,9 +420,9 @@ statuses:
        (i.e. native). This is applicable for both MSRs and CPUIDs. More information
        can be found in :ref:`sec-msrs` and :ref:`sec-cpuids`.
    * - safe
-     - The consumed host input looks to be used in a secure way
+     - The consumed or propagated host input looks to be used in a secure way
    * - concern
-     - The consumed host input is used in an unsecure way. There is an additional
+     - The consumed or propagated host input is used in an unsecure way. There is an additional
        comment indicating the exact reason. All concern items must be addressed
        either by disabling the code that performs the host input processing or by
        writing a patch that fixes the problematic input processing.
@@ -436,78 +445,19 @@ list of “concern” items can be classified into two categories:
 Applying code audit results to different kernel trees
 -----------------------------------------------------
 
-The provided list at https://github.com/intel/ccc-linux-guest-hardening/tree/master/audit/sample_output/5.15-rc1
-of Smatch findings for the version 5.15-rc1 kernel
-contains results of our manual code audit activity for this kernel
-(Please note that the provided list
+The provided `sample audit output <https://github.com/intel/ccc-linux-guest-hardening/blob/master/bkc/audit/sample_output/6.0-rc2/smatch_warns_6.0_tdx_allyesconfig_filtered_analyzed>`_ 
+of check\_host\_input smatch pattern findings for the version 6.0-rc2 kernel
+contains results of our manual code audit activity for this kernel version
+(Please note that the above provided list
 does not have 'safe' or 'concern' markings published) and
 can be used as a baseline for performing a manual audit on other kernel
-versions or on custom vendor kernels. Here is the suggested procedure:
+versions or on custom vendor kernels. The suggested procedure to analyse
+a custom kernel is documented in 'Targeting your own guest kernel'[TBD].
 
-#. Run the provided check\_host\_input Smatch pattern on a desired
-   target kernel tree:
-
-   .. code-block:: bash
-
-       cd kernel_build_directory
-
-       ~/smatch/smatch_scripts/test_kernel.sh
-
-   Smatch stores results in smatch\_warns.txt in the root of the kernel
-   build directory.
-
-#. Process the smatch\_warns.txt output using process\_smatch\_output.py
-   python script. If any additional drivers or subsystems are enabled,
-   the script can be easily modified not to filter these results from
-   the output by adding them into tdx\_allowed\_drivers list.
-
-   .. code-block:: bash
-
-      python3 process_smatch_output.py smatch_warns.txt
-
-   The output file of this step, smatch\_warns.txt\_filtered, is a reduced
-   list of check\_host\_input Smatch findings for a target kernel tree.
-   This file should have all the relevant findings that should be
-   manually audited.
-
-#. Transfer existing manual code audit results from the provided source
-   kernel tree results to the target kernel by running the
-   transfer\_results.py script.
-
-   .. code-block:: bash
-
-      python3 transfer_results.py existing_smatch_audit_results
-      filtered_smatch_warns
-
-The script produces three output files with the \*\_results\_new,
-\*\_results\_old and \*\_results\_analyzed postfixes. The
-\*\_results\_old file contains the manual code audit results that are
-matching between the existing\_smatch\_audit\_results and the
-filtered\_smatch\_warns. These results do not have to be manually
-re-audited since the code in question has not changed.
-
-The \*\_results\_new file contains the results that were impossible to
-automatically transfer due to one of the following reasons:
-
-#. The code location is new in the target kernel tree and has not been
-   part of the previous analysis done for the source kernel tree.
-
-#. The code location has existed before and has been manually audited,
-   but there are some code changes between the target and source kernel
-   trees that require manual re-auditing to confirm the status of the
-   finding (i.e., “safe”, “concern”, etc.)
-
-The reported code locations in the \*\_results\_new file must be
-manually audited following the logic described in
-:ref:`hardening-performing-manual-audit`.
-The \*\_results\_analyzed file is a combination of the \*\_results\_new and
-the \*\_results\_old file with all the entries arranged in the order of
-static analysis scan.
-
-The manual code audit results that were obtained by executing the
-transfer\_results.py script are automatically transferred based on the
+The automatic transfer of the code audit labels (trusted, excluded,
+wrapper, etc.) from the baseline kernel audit version is  based on the
 unique identifiers for each finding. Examples of these findings are
-shown in orange in Figure 2. Identifiers from a source kernel tree
+shown in orange in Figure 2. Identifiers from a baseline kernel tree
 finding and target tree finding must match for a finding to be
 automatically transferred. An identifier is a simple djb2 hash of
 an analyzed code expression together with a relative offset from the
@@ -589,7 +539,7 @@ on exercising and testing the relevant TDX support by the guest OS.
 Please refer to section 24 of 
 `Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_ for official guidance on TDX module interfaces. 
 For example, for the emulation of the MSRs and CPUIDs virtualization the emulated seam
- module does not adhere to the TDX module specification on MSR and CPUID accesses
+module does not adhere to the TDX module specification on MSR and CPUID accesses
 outlined in section 19 of 
 `Intel TDX module architecture specification <https://www.intel.com/content/dam/develop/external/us/en/documents/tdx-module-1.0-public-spec-v0.931.pdf>`_ Instead it just inserts a #VE event on most of the MSRs
 operations and for the CPUID leaves greater than 0x1f or outside of 0x80000000u-0x80000008u

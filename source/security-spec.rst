@@ -691,7 +691,11 @@ TSC and other timers
 TDX has a limited secure time with the TSC timer. The TSC inside a TD is
 guaranteed to be synchronized and monotonous, but not necessarily
 matching real time. A guest can turn it into truly secure wall time by
-using an authenticated time server.
+using a remote authenticated time server. This is the recommended way of
+obtaining the secure time inside a TDX guest. In the absence of a 
+remote authenticated server, TDX guest gets the time from Linux RTC.
+However, Linux RTC has not yet been hardened and its usage presents a
+potential security threat.
 
 By default, for the KVM hypervisor, kvmclock would have priority, which
 is not secure anymore because it uses untrusted input from the host. To

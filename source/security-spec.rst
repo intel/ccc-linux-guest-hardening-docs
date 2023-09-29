@@ -699,11 +699,9 @@ potential security threat.
 
 By default, for the KVM hypervisor, kvmclock would have priority, which
 is not secure anymore because it uses untrusted input from the host. To
-avoid this the kvmclock has been disabled by default when running inside
-a TDX guest. It would also be possible for the host to trigger a TSC
-fallback (e.g. by not scheduling VCPUs or delaying IPIs), which also
-would lead to insecure time. We have also disabled acpi\_pm to prevent
-fallback to that. Additionally, the TSC watchdog is also disabled (by
+avoid this the kvmclock must be disabled by using 'no-kvmclock' cmdline
+option (command line is measured and can be attested).
+Additionally, the TSC watchdog is also disabled (by
 forcing the X86\_FEATURE\_TSC\_RELIABLE bit) to avoid the possible
 fallback to jiffy time, which could be influenced by the host by
 changing the frequency of the timer interrupts.
@@ -941,7 +939,34 @@ be followed.
 tables to the default list specified in the TDX filter. Similarly, as the
 above option, it should be only used for the debug purpose. If an
 additional acpi table needs to be used in TDX guest, it should be included
-in the default TDX filter list after a security audit and risk assessment.    
+in the default TDX filter list after a security audit and risk assessment.
+
+Additionally, to minimize the attack surface the following cmdline options
+are strongly recommended for TDX guests:
+
+.. list-table:: cmdline options
+   :widths: 20 60
+   :header-rows: 1
+
+   * - cmdline option
+     - Purpose
+   * - mce=off
+     - Disables unneeded MCE/MCA subsystem, which hasn't been hardened
+   * - oops=panic
+     - Enables panic on oops, generic security mechanism to harden kernel
+   * - pci=noearly
+     - Disables unneeded early pci subsystem, which hasn't been hardened 
+   * - pci=nommconf
+     - Disables memory mapped pci config space, which hasn't been used so
+       far in TDX guests
+   * - no-kvmclock
+     - Disables kvm-clock as untrusted time source
+   * - random.trust_cpu=y
+     - Trusts architecture-provided DRNG (RDRAND/RDSEED on intel platforms)
+       to provide enough entropy during early boot
+   * - random.trust_bootloader=n
+     - Disables crediting entropy obtained from the bootloader via
+       add_bootloader_randomness. 
 
 Storage protection
 ==================

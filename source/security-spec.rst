@@ -197,6 +197,37 @@ desired for debug purpose, please consult section `Kernel command line`_ on how
 to change configuration of these mechanisms using command line, i.e. modify
 allow/deny list of the device filter, modify the list of allowed ACPI tables, etc.
 
+.. _sec-device-passthrough:
+
+Device passthrough
+------------------
+
+In some deployment models it might be desirable to enable a device passthrough
+for a TDX guest. In the current TDX 1.0 model, it is only possible via the usage
+of a shared memory, i.e. it is not possible to let the devices to access the TDX
+guest private memory. As a result, when a new passthrough device is being enabled
+for a TDX guest, the corresponding device driver in the TDX guest must be authorised
+to run by the device filter mechanism and its MMIO pages must be mapped as shared
+for the communication to happen. This can be done using the following kernel command
+attribute: **authorize_allow_devs=pci:<ven_id:dev_id>**. However, based on the type of
+the interface that device driver uses to create the MMIO mappings, it might not be
+possible to automatically share these pages with the host: 
+
+-  If device driver uses **devm_ioremap*()** or **pci_iomap*()**-style interfaces, the
+   sharing works fine
+
+-  If device driver uses a legacy **ioremap*()**-style interfaces, the
+   sharing won't work and the corresponding device driver must be changed
+   to either use the above interfaces or alternatively a dedicated
+   **ioremap_driver_hardening()** interface that explicitly indicates that an
+   MMIO mapping must be shared with the host
+
+Similar to a non-passthrough case, any device driver enabled in the TDX guest
+using the above mechanism must be hardened to withstand the attacks from hypervisor
+through TDVMCALL or shared memory communication interfaces. Moreover, since
+the device passthrough for TDX 1.0 is using shared memory, any data placed in
+this memory can be manipulated by the host/hypervisor and must be protected where possible
+using application-level security mechanisms, such as encryption and authentication.
 
 .. _sec-tdvmcall-interfaces:
 

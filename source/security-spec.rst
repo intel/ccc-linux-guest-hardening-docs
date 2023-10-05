@@ -224,7 +224,10 @@ possible to automatically share these pages with the host:
 
 Similar to a non-passthrough case, any device driver enabled in the TDX guest
 using the above mechanism must be hardened to withstand the attacks from hypervisor
-through TDVMCALL or shared memory communication interfaces.
+through TDVMCALL or shared memory communication interfaces. Moreover, since
+the device passthrough for TDX 1.0 is using shared memory, any data placed in
+this memory can be manipulated by the host/hypervisor and must be protected where possible
+using application-level security mechanisms, such as encryption and authentication.
 
 .. _sec-tdvmcall-interfaces:
 

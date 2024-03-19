@@ -487,80 +487,28 @@ and results in SIGSEGV.
 
 .. _sec-kvm-hypercalls:
 
-KVM Hypercalls
---------------
+KVM CPUID features and Hypercalls
+---------------------------------
 
-These are controlled by the host and untrusted. They are proxied through
-TDVMCALL.
+For various performance enhancements KVM provides a number of PV features
+towards its guests that are enumerated via KVM CPUIDs. Some of these features
+define respected KVM hypercalls, and some are using other means for communication:
+MSRs, memory structures, etc. Each of such features is under full control of
+the host and should be considered untrusted. KVM hypercalls are proxied through
+TDVMCALL in TDX case. For the full list of KVM features and hypercalls please consult 
+`KVM CPUIDs <https://www.kernel.org/doc/Documentation/virt/kvm/cpuid.rst>`_ 
+and `KVM hypercalls description <https://www.kernel.org/doc/Documentation/virt/kvm/hypercalls.rst>`_ .
 
-Based on the KVM CPUID enabled leaves
-(see `KVM CPUID`_ ), only a KVM\_HC\_SEND\_IPI hypercall is enabled
-currently and it is trivially safe. Three other KVM hypercalls are disabled
-by disabling KVM CPUIDs:
-
- - KVM\_HC\_CLOCK\_PAIRING
-
- - KVM\_HC\_SCHED\_YIELD
-
- - KVM\_HC\_KICK\_CPU
-
-There are other KVM hypercalls supported by the KVM host, 
-but they are not used by the Linux guest.
-See `KVM hypercalls description <https://www.kernel.org/doc/Documentation/virt/kvm/hypercalls.rst>`_ for detailed information.
-
-.. _sec-kvm-cpuid:
-
-KVM CPUID
----------
-
-KVM has many PV CPUIDs. Many of those are unsafe for a TD and are
-filtered when TDX is active.
-
-Unsafe CPUIDs
-~~~~~~~~~~~~~
-
-.. list-table:: Unsafe CPUIDs
-   :widths: 20 55
-   :header-rows: 1
-
-   * - CPUID
-     - Notes
-   * - KVM\_FEATURE\_CLOCKSOURCE
-     - We don’t want to trust the host for time
-   * - KVM\_FEATURE\_CLOCKSOURCE2
-     -
-   * - KVM\_FEATURE\_ASYNC\_PF
-     - Allows injection of arbitrary page faults into
-       the guest, which is almost certainly not safe.
-   * - KVM\_FEATURE\_PV\_EOI
-     - Relies on the host writing to the guest, which
-       requires making that memory decrypted. The current code marks it already decrypted for AMD. Since the interrupts in the TDX module
-       are posted, it is doubtful the EOI mechanism would work anyway,
-       which is more for purely virtual interrupts. So it’s better to be
-       disabled.
-
-Unclear and not needed CPUIDs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-These CPUIDs are disabled for now and potentially could be enabled after
-audit:
-
- - KVM\_FEATURE\_MMU\_OP
- - KVM\_FEATURE\_STEAL\_TIME
- - KVM\_FEATURE\_PV\_UNHALT
- - KVM\_FEATURE\_PV\_TLB\_FLUSH
- - KVM\_FEATURE\_ASYNC\_PF\_VMEXIT
- - KVM\_FEATURE\_POLL\_CONTROL
- - KVM\_FEATURE\_PV\_SCHED\_YIELD: It is unused in Linux.
- - KVM\_FEATURE\_ASYNC\_PF\_INT
- - KVM\_FEATURE\_MSI\_EXT\_DEST\_ID
-
-Safe CPUIDs
-~~~~~~~~~~~
-
- - KVM\_FEATURE\_NOP\_IO\_DELAY: Only affects nops.
- - KVM\_FEATURE\_PV\_SEND\_IPI: Equivalent to APIC write.
- - KVM\_HINTS\_REALTIME: Changes spinlock behavior, but just a hint.
+Based on our security analysis (see `Security implications from KVM PV features <https://github.com/intel/ccc-linux-guest-hardening/issues/152>`_ 
+for more information), only the KVM\_FEATURE\_CLOCKSOURCE(2) CPUIDs
+should be explicitly disabled in the guest kernel, since it would allow the
+guest to rely on host-controlled kvmclock for providing the timing information. The disabling
+can be done via "no-kvmclock" guest kernel cmdline option. 
+The rest of features do not require explicit disabling, because they
+either considered not to have any security implications towards the TDX
+guest (apart from DoS) or already indirectly disabled (KVM_FEATURE_ASYNC_PF,
+KVM_FEATURE_PV_EOI, KVM_FEATURE_STEAL_TIME) because the required memory structures
+are not shared between the host and the guest.
  
  .. _sec-cpuids:
 

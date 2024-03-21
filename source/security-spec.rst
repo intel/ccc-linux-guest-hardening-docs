@@ -972,6 +972,14 @@ also not use local storage and rely on a volume mounted from the network
 after attesting themselves to the network server. However, support for
 such remote storage is out of the scope for this document for now.
 
+*Note*: Commonly used read/write Linux storage protection methods (including
+dmcrypt and dm integrity) do not provide rollback protection.
+If rollback attacks are a concern, the networking-based storage outside
+of attacker control is the recommended option. The absence of rollback
+protection also has implications on guest private memory rollback attacks
+if memory swapping to the filesystem is enabled in the guest kernel. 
+Due to this limitation, we recomend disabling guest memory swap. 
+
 
 .. _sec-virtio:
 
@@ -980,11 +988,16 @@ VirtIO and shared memory
 
 The virtIO subsystem is controlled by the untrusted host/VMM. For the
 application data transferred over the virtIO communication channel, its
-confidentiality and integrity must be guaranteed by the
-application-level mechanisms. For example, virtio block IO is encrypted
-and authenticated using dmcrypt or other similar mechanism, virtio
-network communication uses TLS or similar for the transmitted data. All
-the rest of virtio input received from the host/VMM must be considered
+confidentiality and integrity (and rollback when required) must be
+guaranteed by the application-level mechanisms. For example, virtio block
+IO can be encrypted and authenticated using dmcrypt or other similar mechanism,
+virtio network communication can use TLS or similar for the transmitted data. 
+Please also note that for host visible consoles, like virtio-console, there
+is no existing method to protect the application data due to functional nature
+of the console. For the production systems, we only recommend enabling network
+console over ssh or similar. 
+
+All the rest of virtio input received from the host/VMM must be considered
 untrusted. We need to make sure the that the core virtio code and
 enabled virtio drivers are hardened against the malicious inputs
 received from host/VMM through exposed interfaces, such as pci config

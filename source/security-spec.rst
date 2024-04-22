@@ -634,33 +634,17 @@ for the AMD IOMMU. The other IOMMU drivers should not be active on x86.
 Randomness inside TDX guest
 ===========================
 
-RDRAND/RDSEED
--------------
-
-RDRAND/RDSEED instructions are used for various security purposes and
-their output is expected to conform to the output of the cryptographic
-PRNG. The instructions can return failure, which is then expected to be
-retried. The host could trigger that by depleting the shared hardware
-RNG. Some of the users fall back to alternative ways, which are usually
-insecure because they can be controlled by the host. The implementation
-of the RDRAND/RDSEED invocation in the TDX guest kernel has been changed
-to loop forever on failure.
-
 Linux RNG
 ---------
 
 The Linux RNG uses timing from interrupts as the default entropy source;
 this can be a problem for the TDX guest because timing of the interrupts
-is controlled by the untrusted host/VMM. However, by using Linux RNG
-design, a fresh entropy is added on each invocation of the Linux RNG’s
-Cha-Cha20 DRNG (and for its early seeding) using CPU’s HW RNG
-(RDRAND/RDSEED instructions on modern Intel platforms). We rely on the
-RDRAND/RDSEED instructions as an independent source of entropy that is
-not under the host/VMM control and enforce the
-CONFIG\_RANDOM\_TRUST\_CPU inside a TDX guest. As a side effect, the
-resulting entropy counts for blocking pool (/dev/random) can be
-incorrect, but it is assumed that nowadays people use Cha-Cha20 DRNG
-(/dev/urandom) for cryptographically secure values.
+is controlled by the untrusted host/VMM. However, on x86 platforms there
+is another entropy source that is outside of host/VMM control: RDRAND/RDSEED
+instructions. The commit `x86/coco: Require seeding RNG with RDRAND on CoCo systems <https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/arch/x86/coco/core.c?h=v6.9-rc5&id=99485c4c026f024e7cb82da84c7951dbe3deb584>`_ ensures that a TDX guest
+cannot boot unless 256 bits of RDRAND output is mixed into the entropy pool
+early during the boot process. 
+
 
  .. _sec-time:
 

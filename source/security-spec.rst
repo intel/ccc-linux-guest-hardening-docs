@@ -610,6 +610,14 @@ range 0x40000000 - 0x400000FF to be requested from the untrusted host/VMM.
 If SW inside TDX guest tries to read any other leaf from the above table,
 the value of 0 is returned.
 
+Going forward TDX module introduced a new TDX guest feature, called REDUCE_VE
+(for details consult latest `Intel TDX module architecture specification <https://cdrdv2.intel.com/v1/dl/getContent/733575>`_).
+If this feature is enabled by the TDX guest, all CPUID leaves from the above table
+except the reserved ones (0x80000005, 0x40000000- 0x400000FF) won't result in a #VE
+insertion and will contain the values predefined or calculated by TDX module and
+therefore can be considered trusted. This helps reduce the issues resulting from
+#VE Linux kernel handler returning the value of "0" on these leaves.
+ 
 Perfmon
 -------
 
